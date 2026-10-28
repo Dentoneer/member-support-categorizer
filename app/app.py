@@ -33,7 +33,7 @@ from support_categorizer.sql import (  # noqa: E402
     taxonomy_sql,
     true_counts_sql,
 )
-from support_categorizer.taxonomy import active_labels, apply_request, validate_request  # noqa: E402
+from support_categorizer.taxonomy import active_labels, apply_request, canonical, validate_request  # noqa: E402
 
 st.set_page_config(page_title="Support call review", layout="wide")
 S = Settings(catalog=os.getenv("CATALOG", "workspace"), schema=os.getenv("SCHEMA", "support"))
@@ -101,7 +101,8 @@ with tab_review:
     view = df if cat == "All" else df[df["primary_category"] == cat]
     if low:
         view = view[view["jev_confidence"].isna() | (view["jev_confidence"] < 0.8)]
-    view = view.assign(correct=view["secondary_category"] == view["true_secondary"])
+    true_now = view["true_secondary"].map(lambda x: canonical(x, tax))  # today's name after renames
+    view = view.assign(correct=view["secondary_category"] == true_now)
     st.dataframe(view.drop(columns=["call_transcript"]), use_container_width=True, hide_index=True)
     if len(view):
         cid = st.selectbox("Open a call", view["call_id"])

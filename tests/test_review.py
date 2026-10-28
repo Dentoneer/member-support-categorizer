@@ -60,3 +60,27 @@ def test_volumes_maps_renames_and_keeps_retired():
     assert vol["share_predicted"].sum() == pytest.approx(1.0, abs=0.01)
     prim = primary_volumes(vol.reset_index()).set_index("primary_category")
     assert prim.loc["shipping_issue", "calls_all"] == 14
+
+
+@pytest.mark.spark
+def test_app_write_statements_run_in_spark(spark):
+    """The app's INSERTs must run with named parameters (lambdas are not allowed in VALUES)."""
+    from support_categorizer.tables import DDL
+
+    spark.sql("CREATE DATABASE IF NOT EXISTS sup")
+    s = Settings(catalog="spark_catalog", schema="sup")
+    for t in ("overrides", "taxonomy", "taxonomy_requests"):
+        spark.sql(f"CREATE TABLE IF NOT EXISTS {s.fqn(t)} ({DDL[t][0]}) USING DELTA")
+    spark.sql(request_insert_sql(s), args={
+        "request_id": "r1", "kind": "add", "primary_category": "shipping_issue",
+        "secondary_category": "late_fee", "new_name": None, "description": "d", "reason": "r",
+        "example_call_ids": "1, 2,", "requested_by": "a@b.c"})
+    row = spark.table(s.fqn("taxonomy_requests")).first()
+    assert row.example_call_ids == ["1", "2"] and row.status == "pending"
+    spark.sql(override_insert_sql(s), args={
+        "call_id": "1", "model": "m", "secondary_category": "cost", "primary_category": "shipping_issue",
+        "reviewer": "a", "note": ""})
+    assert spark.table(s.fqn("overrides")).count() == 1
+    q, params = taxonomy_insert_sql(s, seed_rows().head(3).to_dict("records"))
+    spark.sql(q, args=params)
+    assert spark.table(s.fqn("taxonomy")).count() == 3

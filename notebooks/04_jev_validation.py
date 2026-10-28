@@ -56,7 +56,9 @@ rows_pdf = spark.sql(f"""
     WHERE p.model = '{MODEL}'""").toPandas()  # noqa: F821
 if rows_pdf.empty:
     raise UserFacingError(f"No '{MODEL}' predictions yet: run notebook 03 first.")
-truth = spark.table(s.fqn(CALLS_CLEAN)).toPandas()  # noqa: F821
+from support_categorizer.taxonomy import canonical_truth, read_taxonomy
+
+truth = canonical_truth(spark.table(s.fqn(CALLS_CLEAN)).toPandas(), read_taxonomy(spark, s))  # noqa: F821
 truth = truth[truth["call_id"].isin(rows_pdf["call_id"])]
 print(f"{len(rows_pdf)} predictions to validate.")
 

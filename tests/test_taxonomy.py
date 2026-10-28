@@ -64,3 +64,19 @@ def test_canonical_follows_chain():
     all_v = pd.concat([all_v, v3])
     assert canonical("cost", all_v) == "c" and canonical("reset_2fa", all_v) == "reset_2fa"
     assert canonical(None, all_v) is None
+
+
+def test_canonical_truth_maps_renames_and_drops_retired():
+    from support_categorizer.taxonomy import canonical_truth
+
+    t = seed_rows()
+    v2 = apply_request({"kind": "rename", "secondary_category": "cost", "new_name": "shipping_cost",
+                        "reason": "r"}, t, "m")
+    t = pd.concat([t, v2])
+    t = pd.concat([t, apply_request({"kind": "retire", "secondary_category": "missing", "reason": "r"}, t, "m")])
+    truth = pd.DataFrame({"call_id": ["1", "2", "3"], "primary_category": ["shipping_issue"] * 3,
+                          "secondary_category": ["cost", "missing", "status"]})
+    out = canonical_truth(truth, t)
+    assert list(out["call_id"]) == ["1", "3"]
+    assert list(out["secondary_category"]) == ["shipping_cost", "status"]
+    assert list(out["primary_category"]) == ["shipping_issue", "shipping_issue"]

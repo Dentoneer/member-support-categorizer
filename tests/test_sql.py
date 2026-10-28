@@ -63,3 +63,20 @@ def test_app_grants_sql():
 
     g = app_grants_sql(Settings(), "abc-123")
     assert "GRANT MODIFY ON TABLE workspace.support.overrides TO `abc-123`" in g and len(g) == 5
+
+
+def test_schema_has_no_numeric_bounds():
+    # some endpoints reject minimum/maximum; the SQL clamps urgency to 1-5 instead
+    sch = response_schema(FLOWS, sorted(SUBS))
+    assert "minimum" not in sch and "maximum" not in sch
+
+
+def test_needs_fallback():
+    import pandas as pd
+
+    from support_categorizer.sql import needs_fallback
+
+    ok = pd.DataFrame({"valid": [True, True, False], "error": [None, None, None]})
+    all_bad = pd.DataFrame({"valid": [False, False], "error": ["400 responseFormat", "400"]})
+    mostly_err = pd.DataFrame({"valid": [True, False, False], "error": [None, "x", "y"]})
+    assert not needs_fallback(ok) and needs_fallback(all_bad) and needs_fallback(mostly_err)

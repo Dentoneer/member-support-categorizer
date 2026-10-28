@@ -45,12 +45,15 @@ s = notebook_settings(dbutils)  # noqa: F821
 import mlflow
 
 from support_categorizer.baseline import predict_baseline, train_baseline
-from support_categorizer.labels import flow_of
+from support_categorizer.taxonomy import active_labels, canonical_truth, read_taxonomy
 from support_categorizer.tables import accuracy_rows, write_metrics, write_predictions
 
 user = spark.sql("SELECT current_user() AS u").first().u  # noqa: F821
 mlflow.set_experiment(experiment_name(user))
-silver = spark.table(s.fqn(CALLS_CLEAN)).toPandas()  # noqa: F821
+tax = read_taxonomy(spark, s)  # noqa: F821
+_, _, sub_to_flow = active_labels(tax)
+# true labels in today's category names (renames followed, retired categories dropped)
+silver = canonical_truth(spark.table(s.fqn(CALLS_CLEAN)).toPandas(), tax)  # noqa: F821
 sample_ids = set(spark.table(s.fqn(EVAL_SAMPLE)).toPandas()["call_id"])  # noqa: F821
 train = silver[silver["split"] == "train"]
 dev = silver[silver["split"] == "dev"]
@@ -83,7 +86,7 @@ print({k: round(v, 3) for k, v in metrics.items()})
 
 preds = predict_baseline(model, list(sample["call_transcript"]))
 rows = [{"call_id": cid, "model": "baseline", "model_version": "tfidf-1", "run_id": run.info.run_id,
-         "primary_category": flow_of(p), "secondary_category": p, "urgency_score": None,
+         "primary_category": sub_to_flow[p], "secondary_category": p, "urgency_score": None,
          "concise_summary": None, "valid": True}
         for cid, p in zip(sample["call_id"], preds, strict=True)]
 write_predictions(spark, s, rows)  # noqa: F821

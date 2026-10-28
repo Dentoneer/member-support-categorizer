@@ -123,3 +123,17 @@ def read_taxonomy(spark, s) -> pd.DataFrame:
 
 def tax_version(tax: pd.DataFrame) -> int:
     return int(tax["version"].max())
+
+
+def canonical_truth(df: pd.DataFrame, tax: pd.DataFrame) -> pd.DataFrame:
+    """True labels in today's names: renames followed, retired categories dropped, primary re-derived.
+
+    Silver keeps the original ABCD names; every scorer and trainer goes through this so all models
+    are judged on the same calls with the same, current labels.
+    """
+    _, _, sub_to_flow = active_labels(tax)
+    out = df.copy()
+    out["secondary_category"] = [canonical(x, tax) for x in out["secondary_category"]]
+    out = out[out["secondary_category"].isin(sub_to_flow)].copy()
+    out["primary_category"] = out["secondary_category"].map(sub_to_flow)
+    return out.reset_index(drop=True)

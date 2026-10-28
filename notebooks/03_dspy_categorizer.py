@@ -50,13 +50,12 @@ s = notebook_settings(dbutils)  # noqa: F821
 
 import mlflow
 
-from support_categorizer.taxonomy import active_labels, read_taxonomy, tax_version
+from support_categorizer.taxonomy import active_labels, canonical_truth, read_taxonomy, tax_version
 
 tax = read_taxonomy(spark, s)  # noqa: F821
 flows, subflows, sub_to_flow = active_labels(tax)
 tv = tax_version(tax)
-silver = spark.table(s.fqn(CALLS_CLEAN)).toPandas()  # noqa: F821
-silver = silver[silver["secondary_category"].isin(subflows)]
+silver = canonical_truth(spark.table(s.fqn(CALLS_CLEAN)).toPandas(), tax)  # noqa: F821
 sample_ids = set(spark.table(s.fqn(EVAL_SAMPLE)).toPandas()["call_id"])  # noqa: F821
 sample = silver[silver["call_id"].isin(sample_ids)]
 dev = silver[silver["split"] == "dev"].sample(frac=1, random_state=EVAL_SEED)

@@ -83,9 +83,14 @@ from databricks.sdk import WorkspaceClient
 from support_categorizer.sql import app_grants_sql
 
 dbutils.widgets.text("app_name", "support-review")  # noqa: F821
-app = WorkspaceClient().apps.get(dbutils.widgets.get("app_name"))  # noqa: F821
-principal = app.service_principal_client_id
-for stmt in app_grants_sql(s, principal):
+try:
+    app = WorkspaceClient().apps.get(dbutils.widgets.get("app_name"))  # noqa: F821
+except Exception:  # noqa: BLE001
+    app = None
+    print(f"No app named '{dbutils.widgets.get('app_name')}' yet. Create and deploy it first "  # noqa: F821
+          "(README step 3), then rerun this cell.")
+principal = app.service_principal_client_id if app else None
+for stmt in app_grants_sql(s, principal) if principal else []:
     spark.sql(stmt)  # noqa: F821
     print(f"OK  {stmt}")
 # You approve category requests in the app: add yourself to the app's admin list (stored in UC, not code).

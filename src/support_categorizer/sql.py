@@ -37,7 +37,7 @@ def response_schema(flows: list[str], subflows: list[str]) -> str:
         "properties": {
             "primary_category": {"type": "string", "enum": list(flows)},
             "secondary_category": {"type": "string", "enum": list(subflows)},
-            "urgency_score": {"type": "integer", "minimum": 1, "maximum": 5},
+            "urgency_score": {"type": "integer"},  # clamped to 1-5 in SQL
             "concise_summary": {"type": "string"},
         },
         "required": ["primary_category", "secondary_category", "urgency_score", "concise_summary"],
@@ -177,9 +177,10 @@ GROUP BY 1"""
 
 
 def override_insert_sql(s: Settings) -> str:
+    # INSERT ... SELECT (not VALUES): Spark only allows constant expressions in an inline VALUES table.
     return (f"INSERT INTO {s.fqn(OVERRIDES)} (call_id, model, secondary_category, primary_category, "
-            "reviewer, note, overridden_at) VALUES (:call_id, :model, :secondary_category, "
-            ":primary_category, :reviewer, :note, current_timestamp())")  # fmt: skip
+            "reviewer, note, overridden_at) SELECT :call_id, :model, :secondary_category, "
+            ":primary_category, :reviewer, :note, current_timestamp()")  # fmt: skip
 
 
 def taxonomy_sql(s: Settings) -> str:
@@ -194,9 +195,10 @@ def request_insert_sql(s: Settings) -> str:
     """:example_call_ids is a comma-separated string (may be empty)."""
     return (f"INSERT INTO {s.fqn(TAXONOMY_REQUESTS)} (request_id, kind, primary_category, "
             "secondary_category, new_name, description, reason, example_call_ids, requested_by, "
-            "requested_at, status) VALUES (:request_id, :kind, :primary_category, :secondary_category, "
-            ":new_name, :description, :reason, filter(split(:example_call_ids, ','), x -> trim(x) != ''), "
-            ":requested_by, current_timestamp(), 'pending')")  # fmt: skip
+            "requested_at, status) SELECT :request_id, :kind, :primary_category, :secondary_category, "
+            ":new_name, :description, :reason, "
+            "filter(transform(split(:example_call_ids, ','), x -> trim(x)), x -> x != ''), "
+            ":requested_by, current_timestamp(), 'pending'")  # fmt: skip
 
 
 def request_decide_sql(s: Settings) -> str:
@@ -218,10 +220,21 @@ def taxonomy_insert_sql(s: Settings, rows: list[dict]) -> tuple[str, dict]:
             key = f"r{i}_{c}"
             params[key] = None if r.get(c) is None or r.get(c) != r.get(c) else r[c]  # NaN -> NULL
             names.append(f"CAST(:{key} AS INT)" if c == "version" else f":{key}")
-        values.append("(" + ", ".join(names) + ", current_timestamp())")
+        values.append("SELECT " + ", ".join(names) + ", current_timestamp()")
     cols = ", ".join([*TAX_INSERT_COLS, "changed_at"])
-    return f"INSERT INTO {s.fqn(TAXONOMY)} ({cols}) VALUES " + ",\n".join(values), params
+    return f"INSERT INTO {s.fqn(TAXONOMY)} ({cols})\n" + "\nUNION ALL ".join(values), params
 
 
 def is_admin_sql(s: Settings) -> str:
     return f"SELECT count(*) > 0 AS ok FROM {s.fqn(APP_ADMINS)} WHERE lower(email) = lower(:email)"
+
+
+def needs_fallback(result) -> bool:
+    """True if the structured ai_query run mostly failed (e.g. the endpoint rejects responseFormat).
+
+    With failOnError => false such failures come back per row instead of failing the query.
+    """
+    n = len(result)
+    if n == 0:
+        return True
+    return int(result["valid"].sum()) == 0 or result["error"].notna().sum() / n > 0.5
