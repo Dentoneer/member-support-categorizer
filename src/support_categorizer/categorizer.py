@@ -129,20 +129,11 @@ def predict_rows(
 
 
 def configure_lm(endpoint: str) -> dspy.LM:
-    """Databricks Foundation Model API endpoint as the DSPy LM (auth from the notebook)."""
-    import os
+    """Databricks Foundation Model API endpoint as the DSPy LM.
 
-    if not os.environ.get("DATABRICKS_HOST"):
-        try:  # LiteLLM reads these; inside a Databricks notebook the SDK knows them
-            from databricks.sdk import WorkspaceClient
-
-            cfg = WorkspaceClient().config
-            os.environ["DATABRICKS_HOST"] = cfg.host
-            token = cfg.authenticate().get("Authorization", "").removeprefix("Bearer ")
-            if token:
-                os.environ["DATABRICKS_TOKEN"] = token
-        except Exception as e:  # noqa: BLE001 - fall back to LiteLLM's own lookup
-            print(f"(could not read workspace credentials: {e}; trying defaults)")
+    Inside Databricks, LiteLLM signs in through the Databricks SDK on every call, so no token is
+    copied (a copied notebook token can expire during a long optimization run).
+    """
     lm = dspy.LM(f"databricks/{endpoint}", temperature=0, max_tokens=1000, cache=False)
     dspy.configure(lm=lm)
     return lm
