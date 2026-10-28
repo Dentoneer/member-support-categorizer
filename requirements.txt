@@ -1,0 +1,6 @@
+# Installed by Databricks Apps for the review app (app/app.py). Notebooks install their own pins.
+streamlit==1.66.1
+databricks-sql-connector==4.8.0
+databricks-sdk==0.157.0
+pandas
+pyarrow
