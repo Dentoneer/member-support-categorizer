@@ -66,6 +66,10 @@ dbutils.widgets.text("jev_key", "")  # noqa: F821
 
 from support_categorizer.checks import store_jev_key
 
-store_jev_key(w, dbutils.widgets.get("jev_key"))  # noqa: F821
-dbutils.widgets.remove("jev_key")  # noqa: F821
-print("Jev key stored in secret scope 'support'. Rerun the checks cell: it should say OK.")
+key = dbutils.widgets.get("jev_key")  # noqa: F821
+if not key.strip():  # e.g. during "Run all": nothing to store yet
+    print("The jev_key box at the top is empty. Paste your key there, then run just this cell.")
+else:
+    store_jev_key(w, key)
+    dbutils.widgets.remove("jev_key")  # noqa: F821
+    print("Jev key stored in secret scope 'support'. Rerun the checks cell: it should say OK.")
