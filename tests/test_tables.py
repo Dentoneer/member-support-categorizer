@@ -18,6 +18,11 @@ def test_eval_sample_deterministic_and_stratified():
     assert set(s1["secondary_category"]) == {"a", "b", "c"}  # rare class kept
 
 
+def test_eval_sample_exact_size():
+    for n in (7, 20, 33):
+        assert len(make_eval_sample(_test_split(), n=n, seed=1)) == n
+
+
 def test_eval_sample_small_split_returns_all():
     assert len(make_eval_sample(_test_split((2, 1, 1)), n=300)) == 4
 

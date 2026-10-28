@@ -94,6 +94,8 @@ def make_eval_sample(
     quota = (counts / len(df) * n).round().clip(lower=1).astype(int)
     while quota.sum() > n:  # trim the largest classes first
         quota[quota.idxmax()] -= 1
+    while quota.sum() < n:  # top up where the most calls are left unsampled
+        quota[(counts - quota).idxmax()] += 1
     parts = [
         g.sample(n=min(len(g), quota[label]), random_state=seed)
         for label, g in df.groupby("secondary_category", sort=True)
