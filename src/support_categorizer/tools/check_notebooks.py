@@ -5,13 +5,12 @@ Usage: python -m support_categorizer.tools.check_notebooks notebooks app
 
 from __future__ import annotations
 
+import ast
 import importlib
-import re
 import sys
 from pathlib import Path
 
 HEADER = "# Databricks notebook source"
-IMPORT = re.compile(r"^\s*(?:# MAGIC\s+)?from (support_categorizer[\w.]*) import \(?([^)#\n]+)")
 
 
 def _problems(path: Path) -> list[str]:
@@ -23,20 +22,21 @@ def _problems(path: Path) -> list[str]:
         first_cell = text.split("# COMMAND ----------")[0]
         if "What you'll learn" not in first_cell:
             out.append(f"{path.name}: first cell needs a \"What you'll learn\" box")
-    for line in text.splitlines():
-        m = IMPORT.match(line)
-        if not m:
+    try:
+        tree = ast.parse(text)  # MAGIC cells are comments, so a notebook is valid Python
+    except SyntaxError as e:
+        return [*out, f"{path.name}: syntax error line {e.lineno}: {e.msg}"]
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.ImportFrom) and (node.module or "").startswith("support_")):
             continue
-        module, names = m.group(1), [n.strip() for n in m.group(2).split(",") if n.strip()]
         try:
-            mod = importlib.import_module(module)
+            mod = importlib.import_module(node.module)
         except ImportError as e:
-            out.append(f"{path.name}: cannot import {module} ({e})")
+            out.append(f"{path.name}: cannot import {node.module} ({e})")
             continue
-        for n in names:
-            n = n.split(" as ")[0].strip()
-            if not hasattr(mod, n):
-                out.append(f"{path.name}: {module} has no {n}")
+        for alias in node.names:
+            if not hasattr(mod, alias.name):
+                out.append(f"{path.name}: {node.module} has no {alias.name}")
     return out
 
 

@@ -67,3 +67,8 @@ def notebook_settings(dbutils) -> Settings:
     ):
         dbutils.widgets.text(name, default)
     return Settings.from_widgets(dbutils)
+
+
+def experiment_name(user: str) -> str:
+    """MLflow experiment in the user's workspace folder (always writable)."""
+    return f"/Users/{user}/support-categorizer"

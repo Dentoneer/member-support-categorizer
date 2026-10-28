@@ -85,7 +85,41 @@ display(spark.table(s.fqn(CALLS_CLEAN)).limit(5))  # noqa: F821
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **4 · Look at the data.** Calls per split, and per category.
+# MAGIC **4 · Gold tables, the category list, and the fixed test sample.** Creates the (empty) gold tables
+# MAGIC every later notebook writes to. Seeds **version 1 of the category list** (`taxonomy`). It's a
+# MAGIC table, not code, so the review app can add, rename or retire categories later. Picks **300 test calls**
+# MAGIC (`eval_sample`, stratified by sub-category, fixed seed). Every model is scored on exactly these calls.
+
+# COMMAND ----------
+
+from pyspark.sql import functions as F
+
+from support_categorizer.settings import EVAL_SAMPLE, TAXONOMY
+from support_categorizer.tables import ensure_gold_tables, make_eval_sample
+from support_categorizer.taxonomy import seed_rows
+
+ensure_gold_tables(spark, s)  # noqa: F821
+if spark.table(s.fqn(TAXONOMY)).count() == 0:  # noqa: F821
+    (spark.createDataFrame(seed_rows(), schema="version int, primary_category string, "  # noqa: F821
+                           "secondary_category string, description string, status string, "
+                           "renamed_from string, changed_by string")
+     .withColumn("changed_at", F.current_timestamp())
+     .write.mode("append").saveAsTable(s.fqn(TAXONOMY)))
+    print("Category list version 1 written (55 sub-categories).")
+else:
+    print("Category list already exists; kept as is.")
+if not spark.catalog.tableExists(s.fqn(EVAL_SAMPLE)):  # noqa: F821
+    test_pdf = spark.table(s.fqn(CALLS_CLEAN)).where("split = 'test'").toPandas()  # noqa: F821
+    (spark.createDataFrame(make_eval_sample(test_pdf))  # noqa: F821
+     .write.saveAsTable(s.fqn(EVAL_SAMPLE)))
+    spark.sql(f"COMMENT ON TABLE {s.fqn(EVAL_SAMPLE)} IS "  # noqa: F821
+              "'Fixed 300-call test sample every model is scored on (seed 20261028).'")
+print(f"Eval sample: {spark.table(s.fqn(EVAL_SAMPLE)).count()} calls")  # noqa: F821
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC **5 · Look at the data.** Calls per split, and per category.
 
 # COMMAND ----------
 
@@ -96,7 +130,7 @@ display(spark.sql(f"""SELECT primary_category, count(DISTINCT secondary_category
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **5 · Delta features (the exam asks about these).** `DESCRIBE HISTORY` shows every write; `VERSION
+# MAGIC **6 · Delta features (the exam asks about these).** `DESCRIBE HISTORY` shows every write; `VERSION
 # MAGIC AS OF` reads an old version (time travel); `OPTIMIZE` compacts small files for faster reads.
 
 # COMMAND ----------
