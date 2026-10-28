@@ -200,6 +200,47 @@ While Marco runs each notebook, Claude explains each step succinctly (what it is
 how it would be asked in the exam or interview) and answers questions. The notebooks' "What you'll
 learn" boxes and `STUDY.md` hold the same content so it can be reviewed later.
 
+## Delivery in two stages (Marco, 2026-10-28)
+
+Marco: build the **bare minimum functional product first**, then add the rest as enhancements, but
+design stage 1 so stage 2 slots in without rework. (Named "stages" to avoid confusion with the
+CFPB project's Phase 1/Phase 2.)
+
+**Stage 1 — core, functional end to end (target: ready Thursday 2026-10-29).** Notebooks 00, 01, 02,
+03, 05: setup/checks, bronze→silver ingestion, TF-IDF baseline, DSPy categorizer (zero-shot +
+BootstrapFewShot, MLflow tracing, UC registration), and `ai_query` batch inference writing gold
+predictions plus the model comparison. Result: transcripts in, categorized + summarized calls out,
+with real accuracy numbers.
+
+**Stage 2 — enhancements (target: Friday-Saturday), in this order:**
+1. **Jev validation + MLflow Evaluation** (notebook 04): Jev as validator and as a custom judge in
+   `mlflow.evaluate`, plus built-in LLM-judge metrics (summary faithfulness).
+2. **RAG with Mosaic AI Vector Search:** ABCD ships the agent guidelines per subflow; put them in a
+   Delta table, build a **Delta Sync index** (Databricks-managed embeddings), retrieve the top 5
+   guidelines per call and pass them to the DSPy module as context. Evaluated on the same test
+   sample as the stage 1 model (does retrieval lift accuracy?).
+3. **Unity Catalog governance:** `GRANT`s for a reader group, a **column mask** on `customer_tier`,
+   and a walkthrough of lineage in Catalog Explorer.
+4. **Job** (notebook 06) chaining the pipeline (Databricks Workflows).
+5. **Model Serving + Inference Tables:** deploy the registered DSPy model as an endpoint with
+   inference tables on; call it from `ai_query`. Tried on Free Edition; if blocked, the notebook says
+   so and explains the production setup.
+6. **Databricks App** (Streamlit): supervisors browse predictions with Jev confidence and
+   **override** a category; overrides go to a Delta table `support.overrides`.
+
+**Talk-only (in `STUDY.md`, no code):** S3 + UC external locations, AWS MWAA/Airflow vs Workflows,
+dbt-databricks vs PySpark, OCR/pytesseract for attachments, MCP bridge to CRM tools.
+
+**Built for stage 2 from day one (stage 1 must include):**
+- The DSPy Signature has an optional `guidelines` input (empty string in stage 1), so RAG only fills
+  it; same program class, new version in the registry.
+- `predictions` carries `model`, `model_version`, `run_id`, `predicted_at`; it is keyed
+  `(call_id, model)` so Jev, RAG, serving and app-override rows join on it.
+- One shared settings module (`catalog`, `schema`, endpoint names, sample table) used by every
+  notebook, so stage 2 notebooks and the App and Job read the same config.
+- The fixed `support.eval_sample` table exists from stage 1, so every later model is scored on it.
+- Notebooks run headless (no manual edits besides widgets), so the stage 2 Job can call them.
+
 ## Decisions from the builder check (Claude's calls, 2026-10-28)
 
 1. **LLM endpoint:** notebook 00 lists the workspace's Foundation Model endpoints and prefers, in
