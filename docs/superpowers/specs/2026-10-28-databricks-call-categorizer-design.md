@@ -247,6 +247,25 @@ dbt-databricks vs PySpark, OCR/pytesseract for attachments, MCP bridge to CRM to
 - The fixed `support.eval_sample` table exists from stage 1, so every later model is scored on it.
 - Notebooks run headless (no manual edits besides widgets), so the stage 2 Job can call them.
 
+## Workspace facts (Marco's Free Edition, checked 2026-10-28)
+
+- Catalogs: `samples`, `system`, `workspace` -> everything goes in `workspace.support`.
+- Chat endpoints (Foundation Model APIs, `llm/v1/chat`): `databricks-gpt-oss-120b`,
+  `databricks-gpt-oss-20b`, `databricks-qwen3-next-80b-a3b-instruct`,
+  `databricks-qwen35-122b-a10b`, `databricks-gemma-3-12b`, `databricks-meta-llama-3-1-8b-instruct`,
+  `databricks-meta-llama-3-3-70b-instruct`, `databricks-llama-4-maverick`,
+  `databricks-deepseek-v4-flash-0731`.
+- Embedding endpoints: `databricks-gte-large-en`, `databricks-bge-large-en`,
+  `databricks-qwen3-embedding-0-6b` (stage 2 RAG uses `databricks-gte-large-en`).
+- Reachable from serverless: GitHub raw (200), PyPI (200), `https://api.typesafe.ai` (404 on `/`,
+  i.e. reachable). The Jev Colab fallback is not needed.
+- Databricks Apps allowed (none exist yet).
+- **LLM choice:** notebook 00 (or the top of 03) runs a small free bake-off (~30 dev calls each) over
+  `databricks-qwen35-122b-a10b`, `databricks-llama-4-maverick`,
+  `databricks-meta-llama-3-3-70b-instruct`, `databricks-gpt-oss-120b`, picks the best secondary
+  accuracy that also returns valid structured output, and saves it to the shared settings
+  (`llm_endpoint`). Fallback default if the bake-off is skipped: `databricks-meta-llama-3-3-70b-instruct`.
+
 ## Decisions from the builder check (Claude's calls, 2026-10-28)
 
 1. **LLM endpoint:** notebook 00 lists the workspace's Foundation Model endpoints and prefers, in
