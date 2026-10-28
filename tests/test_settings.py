@@ -35,3 +35,27 @@ def test_from_widgets_values():
 
 def test_eval_constants():
     assert (EVAL_N, EVAL_SEED) == (300, 20261028)
+
+
+class _WidgetStore:
+    def __init__(self):
+        self.vals = {}
+        self.widgets = self
+
+    def text(self, name, default):
+        self.vals.setdefault(name, default)
+
+    def get(self, name):
+        return self.vals[name]
+
+
+def test_notebook_settings_uses_saved_bake_off_winner(tmp_path):
+    from support_categorizer.settings import notebook_settings, save_chosen_llm
+
+    path = str(tmp_path / "chosen.txt")
+    assert notebook_settings(_WidgetStore(), chosen_path=path).llm_endpoint == Settings().llm_endpoint
+    save_chosen_llm(Settings(), "databricks-qwen35-122b-a10b", path=path)
+    assert notebook_settings(_WidgetStore(), chosen_path=path).llm_endpoint == "databricks-qwen35-122b-a10b"
+    typed = _WidgetStore()
+    typed.vals["llm_endpoint"] = "my-endpoint"  # a value typed in the box always wins
+    assert notebook_settings(typed, chosen_path=path).llm_endpoint == "my-endpoint"

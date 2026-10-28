@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, replace
 
 RAW_CALLS = "raw_calls"
@@ -18,6 +19,7 @@ MODEL_NAME = "call_categorizer_model"
 MODEL_ALIAS = "champion"
 SECRET_SCOPE = "support"
 SECRET_KEY = "typesafe_api_key"
+CHOSEN_LLM_FILE = "chosen_llm.txt"
 
 DEFAULT_LLM = "databricks-meta-llama-3-3-70b-instruct"
 CANDIDATE_LLMS = [
@@ -57,8 +59,12 @@ class Settings:
         return s
 
 
-def notebook_settings(dbutils) -> Settings:
-    """Create the standard widgets (if missing) and return the Settings they hold."""
+def notebook_settings(dbutils, chosen_path: str | None = None) -> Settings:
+    """Create the standard widgets (if missing) and return the Settings they hold.
+
+    If the llm_endpoint box is left at its default and notebook 03's bake-off saved a winner
+    (`chosen_llm.txt` in the volume), that winner is used.
+    """
     d = Settings()
     for name, default in (
         ("catalog", d.catalog),
@@ -66,7 +72,19 @@ def notebook_settings(dbutils) -> Settings:
         ("llm_endpoint", d.llm_endpoint),
     ):
         dbutils.widgets.text(name, default)
-    return Settings.from_widgets(dbutils)
+    s = Settings.from_widgets(dbutils)
+    path = chosen_path or s.volume_path(CHOSEN_LLM_FILE)
+    if s.llm_endpoint == DEFAULT_LLM and os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            chosen = f.read().strip()
+        if chosen:
+            s = replace(s, llm_endpoint=chosen)
+    return s
+
+
+def save_chosen_llm(s: Settings, endpoint: str, path: str | None = None) -> None:
+    with open(path or s.volume_path(CHOSEN_LLM_FILE), "w", encoding="utf-8") as f:
+        f.write(endpoint)
 
 
 def experiment_name(user: str) -> str:

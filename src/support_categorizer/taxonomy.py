@@ -112,3 +112,14 @@ def canonical(label: str | None, tax: pd.DataFrame) -> str | None:
         seen.add(label)
         label = step[label]
     return label
+
+
+def read_taxonomy(spark, s) -> pd.DataFrame:
+    """All versions of the category list (notebooks and the job read the latest active set)."""
+    from support_categorizer.settings import TAXONOMY
+
+    return spark.table(s.fqn(TAXONOMY)).toPandas()
+
+
+def tax_version(tax: pd.DataFrame) -> int:
+    return int(tax["version"].max())
