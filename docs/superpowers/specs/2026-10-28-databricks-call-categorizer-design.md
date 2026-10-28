@@ -206,27 +206,31 @@ Marco: build the **bare minimum functional product first**, then add the rest as
 design stage 1 so stage 2 slots in without rework. (Named "stages" to avoid confusion with the
 CFPB project's Phase 1/Phase 2.)
 
-**Stage 1 — core, functional end to end (target: ready Thursday 2026-10-29).** Notebooks 00, 01, 02,
-03, 05: setup/checks, bronze→silver ingestion, TF-IDF baseline, DSPy categorizer (zero-shot +
-BootstrapFewShot, MLflow tracing, UC registration), and `ai_query` batch inference writing gold
-predictions plus the model comparison. Result: transcripts in, categorized + summarized calls out,
-with real accuracy numbers.
+**Stage 1 — core, functional end to end (target: ready Thursday 2026-10-29, may slip to Friday
+morning).** Marco moved the App, governance and Jev into stage 1 (2026-10-28):
+- **00** setup/checks; **01** bronze→silver ingestion; **02** TF-IDF baseline; **03** DSPy
+  categorizer (zero-shot + BootstrapFewShot, MLflow tracing, UC registration); **05** `ai_query`
+  batch inference writing gold predictions plus the model comparison.
+- **04 Jev validation + MLflow Evaluation:** Jev as validator and as a custom judge in
+  `mlflow.evaluate`, plus built-in LLM-judge metrics (summary faithfulness).
+- **07 Unity Catalog governance:** `GRANT`s for a reader group, a **column mask** on
+  `customer_tier`, table/column comments, and a walkthrough of lineage in Catalog Explorer.
+- **App** (`app/`, Streamlit, deployed as a **Databricks App**): supervisors browse predictions with
+  Jev confidence, filter by category/confidence, and **override** a category; overrides go to Delta
+  table `support.overrides`. Reads through the SQL warehouse. If Free Edition's App limits block
+  deployment, the README says so with the click-path that does work.
+Result: transcripts in, categorized + summarized + validated calls out, governed in UC, reviewable
+in an app, with real accuracy numbers.
 
 **Stage 2 — enhancements (target: Friday-Saturday), in this order:**
-1. **Jev validation + MLflow Evaluation** (notebook 04): Jev as validator and as a custom judge in
-   `mlflow.evaluate`, plus built-in LLM-judge metrics (summary faithfulness).
-2. **RAG with Mosaic AI Vector Search:** ABCD ships the agent guidelines per subflow; put them in a
+1. **RAG with Mosaic AI Vector Search:** ABCD ships the agent guidelines per subflow; put them in a
    Delta table, build a **Delta Sync index** (Databricks-managed embeddings), retrieve the top 5
    guidelines per call and pass them to the DSPy module as context. Evaluated on the same test
    sample as the stage 1 model (does retrieval lift accuracy?).
-3. **Unity Catalog governance:** `GRANT`s for a reader group, a **column mask** on `customer_tier`,
-   and a walkthrough of lineage in Catalog Explorer.
-4. **Job** (notebook 06) chaining the pipeline (Databricks Workflows).
-5. **Model Serving + Inference Tables:** deploy the registered DSPy model as an endpoint with
+2. **Job** (notebook 06) chaining the pipeline (Databricks Workflows).
+3. **Model Serving + Inference Tables:** deploy the registered DSPy model as an endpoint with
    inference tables on; call it from `ai_query`. Tried on Free Edition; if blocked, the notebook says
    so and explains the production setup.
-6. **Databricks App** (Streamlit): supervisors browse predictions with Jev confidence and
-   **override** a category; overrides go to a Delta table `support.overrides`.
 
 **Talk-only (in `STUDY.md`, no code):** S3 + UC external locations, AWS MWAA/Airflow vs Workflows,
 dbt-databricks vs PySpark, OCR/pytesseract for attachments, MCP bridge to CRM tools.
@@ -236,6 +240,8 @@ dbt-databricks vs PySpark, OCR/pytesseract for attachments, MCP bridge to CRM to
   it; same program class, new version in the registry.
 - `predictions` carries `model`, `model_version`, `run_id`, `predicted_at`; it is keyed
   `(call_id, model)` so Jev, RAG, serving and app-override rows join on it.
+- The App reads only gold tables and the shared settings, so new models (RAG, served) appear in it
+  without App changes.
 - One shared settings module (`catalog`, `schema`, endpoint names, sample table) used by every
   notebook, so stage 2 notebooks and the App and Job read the same config.
 - The fixed `support.eval_sample` table exists from stage 1, so every later model is scored on it.
