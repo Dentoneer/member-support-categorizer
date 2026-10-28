@@ -1,0 +1,4 @@
+# Installed by notebooks with %pip install -r; pinned so every run is the same.
+dspy==3.4.1
+mlflow==3.17.2
+httpx==0.28.1

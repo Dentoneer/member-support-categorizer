@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "support-categorizer"
+version = "0.1.0"
+description = "Member-support call categorizer on Databricks (Delta, DSPy, MLflow, Unity Catalog)"
+requires-python = ">=3.12"
+dependencies = ["pandas", "scikit-learn", "httpx", "dspy", "mlflow"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "pyspark", "delta-spark"]
+app = ["streamlit", "databricks-sql-connector", "databricks-sdk"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["notebooks"]  # Databricks source notebooks use MAGIC cells; see tools/check_notebooks
+
+[tool.pytest.ini_options]
+markers = ["spark: needs a local Spark (Java); skipped when java is not on PATH"]
+pythonpath = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
