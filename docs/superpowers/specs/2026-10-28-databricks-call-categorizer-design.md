@@ -219,6 +219,14 @@ morning).** Marco moved the App, governance and Jev into stage 1 (2026-10-28):
   Jev confidence, filter by category/confidence, and **override** a category; overrides go to Delta
   table `support.overrides`. Reads through the SQL warehouse. If Free Edition's App limits block
   deployment, the README says so with the click-path that does work.
+- **Category change requests in the App (Marco, 2026-10-28):** supervisors can request a new
+  category, a change (rename) or a delete (retire); admins approve or reject. The taxonomy is a
+  **versioned Delta table** (`support.taxonomy`) seeded from ABCD's ontology, with a request log
+  (`support.taxonomy_requests`). Nothing is hard-deleted: retire keeps history valid and rename
+  keeps an alias so old predictions and metrics still map. An approved change creates a new
+  taxonomy version; the DSPy program reads the active labels, so rerunning notebook 03 registers a
+  new model version trained on them. (_Claude's design: an approval step instead of instant edits,
+  because the label set is part of the model and the metrics._)
 Result: transcripts in, categorized + summarized + validated calls out, governed in UC, reviewable
 in an app, with real accuracy numbers.
 
