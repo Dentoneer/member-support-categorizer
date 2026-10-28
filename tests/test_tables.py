@@ -59,3 +59,17 @@ def test_write_predictions_accepts_null_urgency(spark):
     write_predictions(spark, s, [row])
     write_predictions(spark, s, [row])
     assert spark.table(s.fqn("predictions")).count() == 1
+
+
+@pytest.mark.spark
+def test_write_validations_nulls_and_rerun(spark):
+    from support_categorizer.settings import Settings
+    from support_categorizer.tables import DDL, write_validations
+
+    spark.sql("CREATE DATABASE IF NOT EXISTS sup")
+    s = Settings(catalog="spark_catalog", schema="sup")
+    spark.sql(f"CREATE TABLE IF NOT EXISTS {s.fqn('validations')} ({DDL['validations'][0]}) USING DELTA")
+    rows = [{"call_id": "1", "model": "m", "primary_ok": 0.9, "secondary_ok": None, "summary_faithful": 1.0}]
+    write_validations(spark, s, rows)
+    write_validations(spark, s, rows)
+    assert spark.table(s.fqn("validations")).count() == 1

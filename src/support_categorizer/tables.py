@@ -134,3 +134,14 @@ def write_predictions(spark, s: Settings, rows: list[dict]) -> None:
         "predicted_at", F.current_timestamp()
     )
     merge_into(spark, df, s.fqn(PREDICTIONS), ["call_id", "model"])
+
+
+def write_validations(spark, s: Settings, rows: list[dict]) -> None:
+    from pyspark.sql import functions as F
+
+    cols = [c for c in VALIDATION_COLS if c != "validated_at"]
+    data = [tuple(r.get(c) for c in cols) for r in rows]
+    df = spark.createDataFrame(data, schema=DDL[VALIDATIONS][0].rsplit(",", 1)[0]).withColumn(
+        "validated_at", F.current_timestamp()
+    )
+    merge_into(spark, df, s.fqn(VALIDATIONS), ["call_id", "model"])
