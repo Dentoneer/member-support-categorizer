@@ -5,12 +5,15 @@ from __future__ import annotations
 import json
 
 from support_categorizer.settings import (
+    APP_ADMINS,
     CALLS_CLEAN,
     EVAL_SAMPLE,
     METRICS,
     OVERRIDES,
+    PREDICTIONS,
     TAXONOMY,
     TAXONOMY_REQUESTS,
+    VALIDATIONS,
     Settings,
 )
 
@@ -128,3 +131,97 @@ def app_grants_sql(s: Settings, principal: str) -> list[str]:
         f"GRANT USE SCHEMA, SELECT ON SCHEMA {s.catalog}.{s.schema} TO {who}",
         *[f"GRANT MODIFY ON TABLE {s.fqn(t)} TO {who}" for t in (OVERRIDES, TAXONOMY, TAXONOMY_REQUESTS)],
     ]
+
+
+# ---- review app (all parameterized with :named markers; run through the SQL warehouse) ----
+
+
+def _latest_overrides(s: Settings) -> str:
+    return (f"(SELECT * FROM {s.fqn(OVERRIDES)} QUALIFY row_number() OVER "
+            "(PARTITION BY call_id, model ORDER BY overridden_at DESC) = 1)")  # fmt: skip
+
+
+def models_sql(s: Settings) -> str:
+    return f"SELECT DISTINCT model FROM {s.fqn(PREDICTIONS)} ORDER BY model"
+
+
+def review_query_sql(s: Settings) -> str:
+    """One row per scored call of :model: truth, prediction, Jev confidence, latest override."""
+    return f"""SELECT p.call_id, c.customer_tier,
+       c.primary_category AS true_primary, c.secondary_category AS true_secondary,
+       p.primary_category, p.secondary_category, p.urgency_score, p.concise_summary, p.valid,
+       v.secondary_ok AS jev_confidence,
+       o.secondary_category AS override_secondary, o.reviewer AS override_by,
+       c.call_transcript
+FROM {s.fqn(PREDICTIONS)} p
+JOIN {s.fqn(CALLS_CLEAN)} c ON c.call_id = p.call_id
+LEFT JOIN {s.fqn(VALIDATIONS)} v ON v.call_id = p.call_id AND v.model = p.model
+LEFT JOIN {_latest_overrides(s)} o ON o.call_id = p.call_id AND o.model = p.model
+WHERE p.model = :model
+ORDER BY p.call_id"""
+
+
+def true_counts_sql(s: Settings) -> str:
+    return (f"SELECT secondary_category, count(*) AS n FROM {s.fqn(CALLS_CLEAN)} "
+            "GROUP BY secondary_category")  # fmt: skip
+
+
+def predicted_counts_sql(s: Settings) -> str:
+    """Predicted sub-category counts for :model; a supervisor override replaces the prediction."""
+    return f"""SELECT coalesce(o.secondary_category, p.secondary_category) AS secondary_category,
+       count(*) AS n
+FROM {s.fqn(PREDICTIONS)} p
+LEFT JOIN {_latest_overrides(s)} o ON o.call_id = p.call_id AND o.model = p.model
+WHERE p.model = :model AND (p.valid OR o.secondary_category IS NOT NULL)
+GROUP BY 1"""
+
+
+def override_insert_sql(s: Settings) -> str:
+    return (f"INSERT INTO {s.fqn(OVERRIDES)} (call_id, model, secondary_category, primary_category, "
+            "reviewer, note, overridden_at) VALUES (:call_id, :model, :secondary_category, "
+            ":primary_category, :reviewer, :note, current_timestamp())")  # fmt: skip
+
+
+def taxonomy_sql(s: Settings) -> str:
+    return f"SELECT * FROM {s.fqn(TAXONOMY)}"
+
+
+def requests_sql(s: Settings) -> str:
+    return f"SELECT * FROM {s.fqn(TAXONOMY_REQUESTS)} ORDER BY requested_at DESC"
+
+
+def request_insert_sql(s: Settings) -> str:
+    """:example_call_ids is a comma-separated string (may be empty)."""
+    return (f"INSERT INTO {s.fqn(TAXONOMY_REQUESTS)} (request_id, kind, primary_category, "
+            "secondary_category, new_name, description, reason, example_call_ids, requested_by, "
+            "requested_at, status) VALUES (:request_id, :kind, :primary_category, :secondary_category, "
+            ":new_name, :description, :reason, filter(split(:example_call_ids, ','), x -> trim(x) != ''), "
+            ":requested_by, current_timestamp(), 'pending')")  # fmt: skip
+
+
+def request_decide_sql(s: Settings) -> str:
+    return (f"UPDATE {s.fqn(TAXONOMY_REQUESTS)} SET status = :status, decided_by = :decided_by, "
+            "decided_at = current_timestamp(), decision_note = :note "
+            "WHERE request_id = :request_id AND status = 'pending'")  # fmt: skip
+
+
+TAX_INSERT_COLS = ["version", "primary_category", "secondary_category", "description", "status",
+                   "renamed_from", "changed_by"]  # fmt: skip
+
+
+def taxonomy_insert_sql(s: Settings, rows: list[dict]) -> tuple[str, dict]:
+    """Multi-row INSERT of a full taxonomy version, with one named parameter per value."""
+    values, params = [], {}
+    for i, r in enumerate(rows):
+        names = []
+        for c in TAX_INSERT_COLS:
+            key = f"r{i}_{c}"
+            params[key] = None if r.get(c) is None or r.get(c) != r.get(c) else r[c]  # NaN -> NULL
+            names.append(f"CAST(:{key} AS INT)" if c == "version" else f":{key}")
+        values.append("(" + ", ".join(names) + ", current_timestamp())")
+    cols = ", ".join([*TAX_INSERT_COLS, "changed_at"])
+    return f"INSERT INTO {s.fqn(TAXONOMY)} ({cols}) VALUES " + ",\n".join(values), params
+
+
+def is_admin_sql(s: Settings) -> str:
+    return f"SELECT count(*) > 0 AS ok FROM {s.fqn(APP_ADMINS)} WHERE lower(email) = lower(:email)"

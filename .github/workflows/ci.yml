@@ -15,7 +15,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,app]"
       - run: ruff check .
       - run: pytest -q
       - run: python -m support_categorizer.tools.check_notebooks notebooks app

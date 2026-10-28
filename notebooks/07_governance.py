@@ -19,7 +19,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath("../src"))
-from support_categorizer.settings import CALLS_CLEAN, notebook_settings
+from support_categorizer.settings import APP_ADMINS, CALLS_CLEAN, notebook_settings
 
 s = notebook_settings(dbutils)  # noqa: F821
 
@@ -88,6 +88,11 @@ principal = app.service_principal_client_id
 for stmt in app_grants_sql(s, principal):
     spark.sql(stmt)  # noqa: F821
     print(f"OK  {stmt}")
+# You approve category requests in the app: add yourself to the app's admin list (stored in UC, not code).
+me = spark.sql("SELECT current_user() AS u").first().u  # noqa: F821
+spark.sql(f"MERGE INTO {s.fqn(APP_ADMINS)} t USING (SELECT '{me}' AS email) n ON t.email = n.email "  # noqa: F821
+          "WHEN NOT MATCHED THEN INSERT *")
+print(f"OK  {me} can approve category requests in the app")
 
 # COMMAND ----------
 

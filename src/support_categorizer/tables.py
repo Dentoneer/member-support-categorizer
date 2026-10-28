@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from support_categorizer.settings import (
+    APP_ADMINS,
     EVAL_N,
     EVAL_SEED,
     METRICS,
@@ -58,6 +59,7 @@ DDL = {
         "decided_at TIMESTAMP, decision_note STRING",
         "Gold: requests to add, rename or retire a category, and their approval.",
     ),
+    APP_ADMINS: ("email STRING", "Who may approve category changes in the review app."),
 }
 
 
