@@ -27,4 +27,7 @@ _Last updated: 2026-10-28_
 - Marco runs 00 → 05, 07, deploys the app (README). Watch first live run: DSPy Databricks auth,
   ai_query responseFormat support per endpoint, UC registration on Free Edition, Guidelines judge.
 - Stage 2 (Fri-Sat): RAG, Job, Serving.
+- Add a `protect-main` ruleset like the CFPB repo (PR + `lint-and-test` check) if Marco wants it.
+- Local Spark testing: Docker image `msc-spark` (Dockerfile was in the session scratchpad; recreate:
+  python:3.12-slim + openjdk-21-jre-headless + pyspark 4.0.1 / delta-spark 4.0.0).
 - Add to sites-hub (controller).
