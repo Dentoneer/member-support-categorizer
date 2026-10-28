@@ -3,11 +3,15 @@
 _Last updated: 2026-10-28_
 
 ## Current status
-- **Stage 1 code complete** on branch `feat/stage1` (local): notebooks 00-05 + 07, supervisor app,
-  README run guide, STUDY.md. 80+ unit tests pass; Spark code verified in Docker (Spark 4.0 +
-  Delta 4.0) including a rehearsal of notebook 01 on the real ABCD file (10,042 calls, 55
-  sub-categories, 4 tiers). Notebooks have NOT yet run on Databricks.
-- GitHub repo `Dentoneer/member-support-categorizer` not created yet (needs Marco's OK: public repo).
+- **Stage 1 code complete**, PR #1 (`feat/stage1` → `main`) open with CI green:
+  https://github.com/Dentoneer/member-support-categorizer/pull/1. Notebooks 00-05 + 07, supervisor
+  app, README run guide, STUDY.md. 83 unit tests + 8 Spark tests (Docker / CI). Notebook 01 rehearsed
+  on the real ABCD file (10,042 calls, 55 sub-categories, 4 tiers).
+- Final whole-branch review (opus): "ready with fixes" — all 4 fixed (app INSERTs used VALUES with a
+  lambda → INSERT ... SELECT; ai_query JSON fallback; canonical labels after renames; 07 without app).
+  Deferred minors: stale predictions after a retire; retired-then-re-added name; Streamlit
+  use_container_width warnings; ai_query has no per-row retry (documented).
+- **Not yet run on Databricks.** Repo public, secret scanning + push protection on (no ruleset yet).
 
 ## Recent decisions
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
@@ -19,7 +23,7 @@ _Last updated: 2026-10-28_
   status_active; status_delivery_date → status_delivery_time).
 
 ## Open threads / next steps
-- Create + push the GitHub repo (Marco OK), CI green, merge.
+- Marco merges PR #1, then creates the Git folder in Databricks (README step 1).
 - Marco runs 00 → 05, 07, deploys the app (README). Watch first live run: DSPy Databricks auth,
   ai_query responseFormat support per endpoint, UC registration on Free Edition, Guidelines judge.
 - Stage 2 (Fri-Sat): RAG, Job, Serving.
