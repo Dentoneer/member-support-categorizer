@@ -55,3 +55,15 @@ class Settings:
             if value and value.strip():
                 s = replace(s, **{name: value.strip()})
         return s
+
+
+def notebook_settings(dbutils) -> Settings:
+    """Create the standard widgets (if missing) and return the Settings they hold."""
+    d = Settings()
+    for name, default in (
+        ("catalog", d.catalog),
+        ("schema", d.schema),
+        ("llm_endpoint", d.llm_endpoint),
+    ):
+        dbutils.widgets.text(name, default)
+    return Settings.from_widgets(dbutils)
