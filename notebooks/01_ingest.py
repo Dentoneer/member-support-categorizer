@@ -68,6 +68,14 @@ print(f"{s.fqn(RAW_CALLS)}: {spark.table(s.fqn(RAW_CALLS)).count():,} calls")  #
 
 from support_categorizer.ingest import silver_from_bronze
 
+from support_categorizer.sql import undo_mask_sql
+
+if spark.catalog.tableExists(s.fqn(CALLS_CLEAN)):  # noqa: F821
+    try:  # a column mask (notebook 07) blocks overwriting; it is re-applied by rerunning 07
+        spark.sql(undo_mask_sql(s))  # noqa: F821
+        print("Removed the customer_tier mask for the rewrite; rerun notebook 07 to put it back.")
+    except Exception:  # noqa: BLE001 - no mask set: nothing to do
+        pass
 silver = silver_from_bronze(spark.table(s.fqn(RAW_CALLS)))  # noqa: F821
 (silver.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s.fqn(CALLS_CLEAN)))
 for stmt in [

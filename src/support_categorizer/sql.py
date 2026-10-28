@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import json
 
-from support_categorizer.settings import CALLS_CLEAN, EVAL_SAMPLE, METRICS, Settings
+from support_categorizer.settings import (
+    CALLS_CLEAN,
+    EVAL_SAMPLE,
+    METRICS,
+    OVERRIDES,
+    TAXONOMY,
+    TAXONOMY_REQUESTS,
+    Settings,
+)
 
 AI_QUERY_INSTRUCTION = (
     "You categorize member-support calls. Read the call and answer with a JSON object with keys "
@@ -83,3 +91,40 @@ FROM {s.fqn(METRICS)}
 WHERE metric IN ('secondary_accuracy', 'primary_accuracy', 'valid_rate')
 GROUP BY model
 ORDER BY secondary_accuracy DESC"""
+
+
+MASK_FUNCTION = "mask_tier"
+
+
+def governance_sql(s: Settings, reader_group: str = "account users") -> list[tuple[str, str]]:
+    """(what it does, statement) in order: grants, column mask, tags."""
+    grp = f"`{reader_group}`"
+    mask = s.fqn(MASK_FUNCTION)
+    return [
+        ("Let readers see the catalog", f"GRANT USE CATALOG ON CATALOG {s.catalog} TO {grp}"),
+        ("Let readers query every table in the schema",
+         f"GRANT USE SCHEMA, SELECT ON SCHEMA {s.catalog}.{s.schema} TO {grp}"),
+        ("Masking rule: only admins see the real customer tier",
+         f"CREATE OR REPLACE FUNCTION {mask}(tier STRING) RETURNS STRING "
+         "RETURN CASE WHEN is_account_group_member('admins') OR is_member('admins') "
+         "THEN tier ELSE 'restricted' END"),
+        ("Apply the mask to customer_tier",
+         f"ALTER TABLE {s.fqn(CALLS_CLEAN)} ALTER COLUMN customer_tier SET MASK {mask}"),
+        ("Tag the silver table (data classification)",
+         f"ALTER TABLE {s.fqn(CALLS_CLEAN)} SET TAGS ('layer' = 'silver', 'domain' = 'member_support', "
+         "'contains' = 'customer_conversations')"),
+    ]  # fmt: skip
+
+
+def undo_mask_sql(s: Settings) -> str:
+    return f"ALTER TABLE {s.fqn(CALLS_CLEAN)} ALTER COLUMN customer_tier DROP MASK"
+
+
+def app_grants_sql(s: Settings, principal: str) -> list[str]:
+    """What the review app's service principal needs: read everything, write its own tables."""
+    who = f"`{principal}`"
+    return [
+        f"GRANT USE CATALOG ON CATALOG {s.catalog} TO {who}",
+        f"GRANT USE SCHEMA, SELECT ON SCHEMA {s.catalog}.{s.schema} TO {who}",
+        *[f"GRANT MODIFY ON TABLE {s.fqn(t)} TO {who}" for t in (OVERRIDES, TAXONOMY, TAXONOMY_REQUESTS)],
+    ]

@@ -43,3 +43,13 @@ def test_app_file_only_checks_imports(tmp_path):
     src = "from support_categorizer.settings import Settings\n"
     (d / "app.py").write_text(src, encoding="utf-8")
     assert main([str(d)]) == 0
+
+
+def test_no_python_comments_inside_sql_strings():
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "notebooks"
+    for nb in root.glob("*.py"):
+        text = nb.read_text(encoding="utf-8")
+        assert not re.search(r'"""[ \t]*#', text), f"{nb.name}: a '# ...' comment is inside a SQL string"

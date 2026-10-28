@@ -46,3 +46,20 @@ def test_ai_query_sql_parses_in_spark(spark):
         q = ai_query_sql(Settings(), "ep", FLOWS, {**SUBS, "it's": "shipping_issue"}, structured=structured)
         parser.parsePlan(q)  # raises ParseException on bad quoting
     parser.parsePlan(comparison_sql(Settings()))
+
+
+def test_governance_sql_order_and_names():
+    from support_categorizer.sql import governance_sql, undo_mask_sql
+
+    stmts = [q for _, q in governance_sql(Settings())]
+    assert stmts[0] == "GRANT USE CATALOG ON CATALOG workspace TO `account users`"
+    assert "FUNCTION workspace.support.mask_tier" in stmts[2]
+    assert stmts[3].endswith("SET MASK workspace.support.mask_tier")
+    assert "DROP MASK" in undo_mask_sql(Settings())
+
+
+def test_app_grants_sql():
+    from support_categorizer.sql import app_grants_sql
+
+    g = app_grants_sql(Settings(), "abc-123")
+    assert "GRANT MODIFY ON TABLE workspace.support.overrides TO `abc-123`" in g and len(g) == 5
