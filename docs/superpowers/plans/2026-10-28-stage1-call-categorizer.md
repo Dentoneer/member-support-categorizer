@@ -510,6 +510,13 @@ Notebook 07 (UC governance: RBAC, masking, lineage, comments; Governance 8%):
 - `review_query_sql(settings, model: str) -> str`: one row per eval-sample call with `call_id`,
   `customer_tier`, true labels, predicted labels, `secondary_ok` (Jev), the latest override if any,
   and transcript.
+- `volume_sql(settings, model: str) -> str` (Marco, 2026-10-28: the app shows categories and their
+  volumes): per `primary_category`, `secondary_category`, the number of calls by true label across
+  all of `calls_clean` (column `calls_all`) and by the selected model's predicted label on its
+  scored rows (`calls_predicted`). Latest override wins, labels go through `canonical`, and
+  retired categories are flagged. In the App this is the first tab, **"Categories & volumes"**: a
+  bar chart of primary categories (drill-down select → bar chart of their secondary categories),
+  plus a table with counts, % share and status (active/retired).
 - `override_insert_sql(settings) -> str`: a parameterized `INSERT INTO overrides` with named
   markers `:call_id, :model, :secondary_category, :primary_category, :reviewer, :note`;
   `overridden_at = current_timestamp()`.
