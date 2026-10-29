@@ -1,6 +1,6 @@
 # STATE
 
-_Last updated: 2026-10-29 (overnight stage 2 build; final review in progress, then PR)_
+_Last updated: 2026-10-29 (overnight stage 2 build done; reviewed + fixed; PR open for Marco)_
 
 ## Current status
 - **Stage 1 merged (PR #1, #2) and run live on Marco's Free Edition (2026-10-28).** 00-05 + 07 ran;
@@ -24,6 +24,9 @@ _Last updated: 2026-10-29 (overnight stage 2 build; final review in progress, th
   `support-categorizer-refresh`: ingest -> baseline / guidelines_index / governance -> ai_query);
   Model Serving (notebook 09, `support-categorizer`, scale-to-zero, AI Gateway inference table
   `serving_payload`); app defaults to best model; 04 validates dspy_rag + PII scorers.
+  Final review (opus): 0 critical, 5 important — all fixed with tests (VS error handling/NotFound,
+  fail fast on failed endpoint/index, wait for renamed keys in the index, champion replaced when
+  trained on an older taxonomy version, serving rerun doesn't rebuild). 130 tests + 9 Spark pass.
 
 ## Recent decisions
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
