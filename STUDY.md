@@ -25,6 +25,19 @@ Exam: Databricks Generative AI Engineer Associate. Domains: Design 14%, Data Pre
 | App | **Databricks Apps** (Streamlit), SQL warehouse resource, service principal | Deployment | "Supervisors see volumes per category, review low-confidence calls, override labels, and request taxonomy changes. The app runs as its own service principal with least-privilege grants." |
 | Taxonomy as data | versioned Delta table + approval workflow | Design / Governance | "Categories live in a versioned table; changes go through request and approval, nothing is hard-deleted, and each change produces a new model version." |
 
+## Stage 2 additions
+
+| Component | Feature | Domain | Interview answer |
+|---|---|---|---|
+| PII in generated text | prompt rule + regex scorer + `Guidelines` judge | Governance / Evaluation | "Column masks don't cover what an LLM writes: the first run copied names and tiers into summaries. I added a no-PII rule to the prompt, a regex check and an LLM judge to evaluation, and report a PII rate per model." |
+| Guidelines table | Delta table with **Change Data Feed** | Data Prep | "Each category has a guideline (intent plus contrast hints). Categories added through the review app flow into the same table, so retrieval learns new categories without retraining." |
+| Retrieval | **Mosaic AI Vector Search**, **Delta Sync index**, managed embeddings (`databricks-gte-large-en`) | App Dev / Data Prep | "A Delta Sync index embeds the guidelines and stays in sync with the table. I query with the customer's own lines and pass the top 8 guidelines into the DSPy signature." |
+| Retrieval quality | recall@k | Evaluation | "I measure retrieval separately (is the right guideline in the top 8?) before blaming the LLM." |
+| Champion/challenger | UC model **aliases** + version tags | Deployment | "New programs register as `challenger` with their test score; they take `champion` only if they beat it, and serving and batch follow the alias." |
+| Resources | `mlflow` model `resources` (LLM endpoint, VS index) | Deployment / Governance | "The model declares what it calls, so Model Serving gets scoped credentials automatically: no keys in code." |
+| Job | **Databricks Workflows**: task DAG, retries, parameters, serverless | Deployment | "ingest → baseline / index sync / governance → batch scoring, upserted by name from the Git folder; Airflow (MWAA) could trigger the same job." |
+| Serving | **Model Serving**, scale to zero, **AI Gateway inference table** | Deployment / Monitoring | "The champion is a REST endpoint; every request and response is logged to a Delta table for monitoring and future evaluation sets; `ai_query` can call it from SQL too." |
+
 ## Talk-only (not built here; how they would fit)
 
 - **AWS S3 + UC external locations.** In production, transcripts land in an S3 bucket registered as a
@@ -39,10 +52,8 @@ Exam: Databricks Generative AI Engineer Associate. Domains: Design 14%, Data Pre
   like any transcript.
 - **MCP bridge.** Expose the categorizer as a tool (via a Model Serving endpoint) that agent
   frameworks and CRM assistants call through the Model Context Protocol.
-- **Model Serving + inference tables + AI Gateway** (stage 2): host `@champion` as an endpoint, log
-  every request and response to a Delta table for monitoring, and apply rate limits and guardrails.
-- **Vector Search / RAG** (stage 2): index the category guidelines with a Delta Sync index, retrieve
-  the top 5 for each call and pass them in the `guidelines` input.
+- **AI Gateway guardrails and rate limits**: on the same serving endpoint, add PII and safety
+  guardrails and per-user rate limits (built here: the inference table only).
 
 ## The story to tell
 

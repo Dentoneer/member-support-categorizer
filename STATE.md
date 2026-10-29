@@ -15,6 +15,16 @@ _Last updated: 2026-10-29_
 - Git folder conflict (workspace copy edited by Assistant/Genie) -> fixed by deleting and
   re-creating the Git folder. Rule: never edit in the workspace; only Pull.
 
+- **Stage 2 built overnight (2026-10-29), PR open, NOT run on Databricks yet** (branch `feat/stage2`):
+  PII-safe summaries (prompt rule + regex `pii.py` + Guidelines judge; `summary_pii_rate` metric);
+  RAG (notebook 08: ABCD guidelines -> `category_guidelines` (CDF) -> Vector Search endpoint
+  `support-vs` + Delta Sync index `category_guidelines_index` (gte-large); program retrieves top 8
+  itself; recall@8 metric; models `dspy_rag_zero_shot`, `dspy_rag`); champion/challenger aliases
+  with score tags (03 and 08 both register `challenger`, promote only if better); Job (notebook 06,
+  `support-categorizer-refresh`: ingest -> baseline / guidelines_index / governance -> ai_query);
+  Model Serving (notebook 09, `support-categorizer`, scale-to-zero, AI Gateway inference table
+  `serving_payload`); app defaults to best model; 04 validates dspy_rag + PII scorers.
+
 ## Recent decisions
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
 - Two stages: stage 1 = core + Jev + UC governance + app (Marco moved those in); stage 2 = RAG
@@ -27,7 +37,10 @@ _Last updated: 2026-10-29_
 ## Open threads / next steps
 - Marco to try the app's review/override and category-request tabs and report.
 - Check whether MLflow traces appear (Traces tab was empty early in the 03 run).
-- Stage 2 (Fri-Sat): RAG, Job, Serving.
+- Marco reviews/merges the stage 2 PR, Pulls, runs 03 -> 08 -> 04 -> 05 -> 06 -> 09, redeploys the app.
+- Watch on first live run: VS endpoint provisioning time / Free Edition limit, query_index response
+  shape, mlflow.dspy log with resources, serving custom model on Free Edition, ai_query on a custom
+  endpoint, job notebook paths.
 - Add a `protect-main` ruleset like the CFPB repo (PR + `lint-and-test` check) if Marco wants it.
 - Local Spark testing: Docker image `msc-spark` (Dockerfile was in the session scratchpad; recreate:
   python:3.12-slim + openjdk-21-jre-headless + pyspark 4.0.1 / delta-spark 4.0.0).
