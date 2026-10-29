@@ -36,7 +36,10 @@ from support_categorizer.settings import (
 )
 
 s = notebook_settings(dbutils)  # noqa: F821
-MODEL = "dspy_optimized"  # the model whose answers Jev checks
+# Jev checks the best DSPy model: the RAG one (notebook 08) if it has run, else the stage 1 one.
+_have = {r.model for r in spark.sql(f"SELECT DISTINCT model FROM {s.fqn(PREDICTIONS)}").collect()}  # noqa: F821
+MODEL = "dspy_rag" if "dspy_rag" in _have else "dspy_optimized"
+print(f"Validating model: {MODEL}")
 
 # COMMAND ----------
 
@@ -102,6 +105,9 @@ print(f"Auto-accepted (Jev > 0.8): {pct(rep['auto_accept_rate'])} of calls, "
       f"{pct(rep['accuracy_auto_accepted'])} of them correct")
 print(f"Sent to a human: {pct(1 - rep['auto_accept_rate'])} of calls, "
       f"{pct(rep['accuracy_sent_to_human'])} of them correct")
+from support_categorizer.pii import pii_rate
+
+print(f"Summaries containing personal data (regex check): {pii_rate(rows_pdf['concise_summary']):.0%}")
 write_metrics(spark, s, [  # noqa: F821
     {"model": f"jev_on_{MODEL}", "metric": k, "value": float(v), "n": rep["validated_calls"]}
     for k, v in rep.items() if k != "validated_calls" and v is not None])
@@ -109,9 +115,10 @@ write_metrics(spark, s, [  # noqa: F821
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **4 · MLflow Evaluation (50 calls).** Runs three scorers in one evaluation run: an exact-match check
-# MAGIC against the true label, **Jev** as a custom scorer, and MLflow's built-in **Guidelines** judge for
-# MAGIC summary faithfulness (Databricks' own hosted judge). Open the run → *Evaluations*
+# MAGIC **4 · MLflow Evaluation (50 calls).** Five scorers in one evaluation run: an exact-match check
+# MAGIC against the true label, **Jev** as a custom scorer, two built-in **Guidelines** judges (summary
+# MAGIC faithfulness, and *no personal data*), and a free regex **PII check**. Column masks don't cover
+# MAGIC text the LLM writes, so the summary is checked for names, emails, order numbers and tiers. Open the run → *Evaluations*
 # MAGIC to see every row with its scores and reasoning.
 
 # COMMAND ----------
@@ -120,6 +127,7 @@ import mlflow
 from mlflow.genai.scorers import Guidelines, scorer
 
 from support_categorizer.jev import jev_scorer
+from support_categorizer.pii import pii_findings
 
 user = spark.sql("SELECT current_user() AS u").first().u  # noqa: F821
 mlflow.set_experiment(experiment_name(user))
@@ -139,10 +147,20 @@ def secondary_correct(outputs, expectations) -> bool:
 faithful = Guidelines(name="summary_faithful",  # on Databricks the default judge is Databricks-hosted
                       guidelines="The concise_summary only states facts that appear in the call "
                                  "transcript and describes the customer's actual request.")
+no_personal_data = Guidelines(name="summary_no_personal_data",
+                              guidelines="The concise_summary contains no personal data: no names, email "
+                                         "addresses, phone numbers, usernames, order or account numbers, "
+                                         "and not the customer's membership level.")
+
+
+@scorer
+def summary_has_no_pii(outputs) -> bool:
+    """Code check (regex) - fast and free, complements the LLM judge above."""
+    return not pii_findings(outputs.get("concise_summary"))
 try:
     with mlflow.start_run(run_name=f"evaluate_{MODEL}"):
-        res = mlflow.genai.evaluate(data=data, scorers=[secondary_correct,
-                                                        jev_scorer(client, s.jev_model), faithful])
+        res = mlflow.genai.evaluate(data=data, scorers=[secondary_correct, jev_scorer(client, s.jev_model),
+                                                        faithful, no_personal_data, summary_has_no_pii])
     display(pd.DataFrame([res.metrics]).T.rename(columns={0: "value"}))  # noqa: F821
 except Exception as e:  # the Jev numbers above are already saved; this part is a bonus
     print(f"MLflow Evaluation could not run here ({str(e)[:300]}). The Jev results above are saved.")

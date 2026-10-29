@@ -247,3 +247,10 @@ def needs_fallback(result) -> bool:
     if n == 0:
         return True
     return int(result["valid"].sum()) == 0 or result["error"].notna().sum() / n > 0.5
+
+
+def best_model_sql(s: Settings) -> str:
+    """The scored model with the highest sub-category accuracy (the app's default view)."""
+    return f"""SELECT m.model FROM {s.fqn(METRICS)} m
+WHERE m.metric = 'secondary_accuracy' AND m.model IN (SELECT DISTINCT model FROM {s.fqn(PREDICTIONS)})
+ORDER BY m.value DESC LIMIT 1"""
