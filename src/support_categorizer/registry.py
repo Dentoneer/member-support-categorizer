@@ -86,3 +86,20 @@ def promote(s: Settings, version: str) -> None:
     mlflow.set_registry_uri("databricks-uc")
     mlflow.MlflowClient().set_registered_model_alias(s.fqn(MODEL_NAME), MODEL_ALIAS, version)
     print(f"Version {version} is now the champion.")
+
+
+def tag_score(s: Settings, version: str, score: float) -> None:
+    mlflow.set_registry_uri("databricks-uc")
+    mlflow.MlflowClient().set_model_version_tag(s.fqn(MODEL_NAME), version, "secondary_accuracy",
+                                                f"{score:.4f}")  # fmt: skip
+
+
+def champion_score(s: Settings, fallback: float | None = None) -> float | None:
+    """The champion version's stored score; `fallback` (e.g. from the metrics table) if untagged."""
+    try:
+        mlflow.set_registry_uri("databricks-uc")
+        mv = mlflow.MlflowClient().get_model_version_by_alias(s.fqn(MODEL_NAME), MODEL_ALIAS)
+        tag = (mv.tags or {}).get("secondary_accuracy")
+        return float(tag) if tag is not None else fallback
+    except Exception:  # noqa: BLE001 - no champion yet
+        return fallback

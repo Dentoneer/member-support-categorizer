@@ -9,6 +9,7 @@ from support_categorizer.settings import (
     APP_ADMINS,
     EVAL_N,
     EVAL_SEED,
+    GUIDELINES,
     METRICS,
     OVERRIDES,
     PREDICTIONS,
@@ -155,3 +156,24 @@ def write_validations(spark, s: Settings, rows: list[dict]) -> None:
         "validated_at", F.current_timestamp()
     )
     merge_into(spark, df, s.fqn(VALIDATIONS), ["call_id", "model"])
+
+
+GUIDELINES_DDL = (
+    "secondary_category STRING NOT NULL, primary_category STRING, guideline_text STRING, source STRING"
+)
+
+
+def write_guidelines(spark, s: Settings, pdf: pd.DataFrame) -> None:
+    """Upsert the guideline rows and delete categories no longer active. Change Data Feed is on, so
+    the Vector Search Delta Sync index can pick up exactly what changed."""
+    from support_categorizer.sql import sql_str  # local import: sql.py is a sibling, avoid a cycle
+
+    table = s.fqn(GUIDELINES)
+    spark.sql(f"CREATE TABLE IF NOT EXISTS {table} ({GUIDELINES_DDL}) USING DELTA "
+              "COMMENT 'Gold: one guideline per active category; source of the Vector Search index.' "
+              "TBLPROPERTIES (delta.enableChangeDataFeed = true)")  # fmt: skip
+    df = spark.createDataFrame(pdf[["secondary_category", "primary_category", "guideline_text", "source"]],
+                               schema=GUIDELINES_DDL.replace(" NOT NULL", ""))  # fmt: skip
+    merge_into(spark, df, table, ["secondary_category"])
+    keep = ", ".join(sql_str(x) for x in pdf["secondary_category"])
+    spark.sql(f"DELETE FROM {table} WHERE secondary_category NOT IN ({keep})")

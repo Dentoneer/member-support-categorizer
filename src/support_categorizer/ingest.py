@@ -13,16 +13,10 @@ from support_categorizer.transcript import MAX_CHARS, MIN_TURNS
 ABCD_URL = "https://github.com/asappresearch/abcd/raw/master/data/abcd_v1.1.json.gz"
 ABCD_FILE = "abcd_v1.1.json.gz"
 
-UPLOAD_HELP = (
-    "Could not download the ABCD data from GitHub ({err}). One-time fix (1 minute): on your laptop "
-    f"open {ABCD_URL} to download {ABCD_FILE}; in Databricks go to Catalog > workspace > support > "
-    "landing > 'Upload to this volume' and upload it; then rerun this cell."
-)
 
-
-def download_abcd(dest_path: str, url: str = ABCD_URL) -> str:
-    """Download the ABCD file into the Volume path unless it is already there."""
-    if os.path.exists(dest_path) and os.path.getsize(dest_path) > 1_000_000:
+def download_file(url: str, dest_path: str, min_bytes: int, file_name: str) -> str:
+    """Download `url` into the Volume path unless a big-enough copy is already there."""
+    if os.path.exists(dest_path) and os.path.getsize(dest_path) > min_bytes:
         print(f"Already downloaded: {dest_path}")
         return dest_path
     import httpx
@@ -35,10 +29,18 @@ def download_abcd(dest_path: str, url: str = ABCD_URL) -> str:
                 for chunk in r.iter_bytes():
                     f.write(chunk)
     except (httpx.HTTPError, OSError) as e:
-        raise UserFacingError(UPLOAD_HELP.format(err=type(e).__name__)) from None
+        raise UserFacingError(
+            f"Could not download {file_name} from GitHub ({type(e).__name__}). One-time fix (1 minute): "
+            f"on your laptop open {url} to download it; in Databricks go to Catalog > workspace > "
+            f"support > landing > 'Upload to this volume', upload it as {file_name}, then rerun this cell."
+        ) from None
     os.replace(tmp, dest_path)
-    print(f"Downloaded {os.path.getsize(dest_path) / 1e6:.0f} MB to {dest_path}")
+    print(f"Downloaded {os.path.getsize(dest_path) / 1e6:.1f} MB to {dest_path}")
     return dest_path
+
+
+def download_abcd(dest_path: str, url: str = ABCD_URL) -> str:
+    return download_file(url, dest_path, 1_000_000, ABCD_FILE)
 
 
 BRONZE_SCHEMA = (
