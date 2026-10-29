@@ -40,7 +40,8 @@ _Last updated: 2026-10-29 (stage 2 merged; learning walkthrough started; protect
   vs Jev >0.8: 58% at 89%. Idea for later (not requested): confirm when the models agree, and send
   disagreements to a human (or use the baseline label).
   05 ai_query .653/.707 (valid 100%; yesterday .677, within noise).
-  Still to run: 07, 06, 09, app redeploy.
+  07 rerun OK (mask restored).
+  Still to run: 06, 09, app redeploy.
 
 ## Recent decisions
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
