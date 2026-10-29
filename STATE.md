@@ -35,6 +35,10 @@ _Last updated: 2026-10-29 (stage 2 merged; learning walkthrough started; protect
   human 42% at 74%; regex PII 4%. MLflow eval (50 calls): values .74/.76/.96/.80/.30 (names were hidden by
   display(); fixed). Suspect the `summary_no_personal_data` Guidelines judge (~.30) is over-strict vs regex
   (.96): check its reasoning in the Evaluations tab.
+  **Agreement beats Jev as the confirmation signal** (SQL, 300 calls): baseline and dspy_rag agree on 246
+  (82%) at 95.9% accuracy; they disagree on 53 (18%), where RAG is right 20.8% and the baseline is right ~70%.
+  vs Jev >0.8: 58% at 89%. Idea for later (not requested): confirm when the models agree, and send
+  disagreements to a human (or use the baseline label).
   Still to run: 05, 07, 06, 09, app redeploy.
 
 ## Recent decisions
