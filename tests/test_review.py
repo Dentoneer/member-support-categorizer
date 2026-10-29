@@ -84,3 +84,13 @@ def test_app_write_statements_run_in_spark(spark):
     q, params = taxonomy_insert_sql(s, seed_rows().head(3).to_dict("records"))
     spark.sql(q, args=params)
     assert spark.table(s.fqn("taxonomy")).count() == 3
+
+
+def test_volumes_compares_true_and_predicted_on_scored_calls():
+    tax = seed_rows()
+    vol = volumes(pd.DataFrame({"secondary_category": ["cost"], "n": [100]}),
+                  pd.DataFrame({"secondary_category": ["cost"], "n": [4]}), tax,
+                  scored_true=pd.DataFrame({"secondary_category": ["cost"], "n": [30]})).set_index("secondary_category")
+    assert (vol.loc["cost", "calls_all"], vol.loc["cost", "calls_true_scored"], vol.loc["cost", "calls_predicted"]) == (100, 30, 4)
+    prim = primary_volumes(vol.reset_index()).set_index("primary_category")
+    assert prim.loc["shipping_issue", "calls_true_scored"] == 30

@@ -166,6 +166,14 @@ def true_counts_sql(s: Settings) -> str:
             "GROUP BY secondary_category")  # fmt: skip
 
 
+def scored_true_counts_sql(s: Settings) -> str:
+    """True sub-category counts over the calls :model scored (same calls as predicted counts)."""
+    return f"""SELECT c.secondary_category, count(*) AS n
+FROM {s.fqn(PREDICTIONS)} p JOIN {s.fqn(CALLS_CLEAN)} c ON c.call_id = p.call_id
+WHERE p.model = :model
+GROUP BY 1"""
+
+
 def predicted_counts_sql(s: Settings) -> str:
     """Predicted sub-category counts for :model; a supervisor override replaces the prediction."""
     return f"""SELECT coalesce(o.secondary_category, p.secondary_category) AS secondary_category,
