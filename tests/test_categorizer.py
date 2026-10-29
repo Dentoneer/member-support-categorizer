@@ -96,3 +96,19 @@ def test_examples_from_has_inputs():
     ex = examples_from(df)[0]
     assert set(ex.inputs().keys()) == {"call_transcript", "customer_tier", "guidelines"}
     assert ex.secondary_category == "reset_2fa"
+
+
+def test_program_retrieves_guidelines_only_when_missing():
+    seen = []
+
+    def retriever(transcript):
+        seen.append(transcript)
+        return "- reset_2fa (account_access): customer cannot pass 2FA"
+
+    prog = CallCategorizerProgram(FLOWS, SUBS, retriever=retriever)
+    lm = DummyLM([_answer(), _answer()])
+    with dspy.context(lm=lm):
+        prog(call_transcript="t1", customer_tier="gold")
+        prog(call_transcript="t2", customer_tier="gold", guidelines="given")
+    assert seen == ["t1"]
+    assert "customer cannot pass 2FA" in str(lm.history[0]["messages"])

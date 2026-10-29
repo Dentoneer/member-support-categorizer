@@ -38,12 +38,15 @@ def make_signature(flows: list[str], subflows: list[str]) -> type[dspy.Signature
 class CallCategorizerProgram(dspy.Module):
     """ChainOfThought over CallCategorizer; primary is re-derived from the secondary category."""
 
-    def __init__(self, flows: list[str], sub_to_flow: dict[str, str]):
+    def __init__(self, flows: list[str], sub_to_flow: dict[str, str], retriever=None):
         super().__init__()
         self.sub_to_flow = dict(sub_to_flow)
+        self.retriever = retriever  # optional: transcript -> guidelines text (RAG, stage 2)
         self.categorize = dspy.ChainOfThought(make_signature(flows, sorted(sub_to_flow)))
 
     def forward(self, call_transcript: str, customer_tier: str, guidelines: str = ""):
+        if not guidelines and self.retriever is not None:
+            guidelines = self.retriever(call_transcript)
         pred = self.categorize(
             call_transcript=call_transcript, customer_tier=customer_tier, guidelines=guidelines
         )
