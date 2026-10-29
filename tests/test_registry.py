@@ -93,3 +93,11 @@ def test_dspy_program_with_retriever_roundtrips_through_mlflow(tmp_path):
     loaded = mlflow.dspy.load_model(info.model_uri)
     assert loaded.retriever.index_name == "cat.sch.idx" and loaded.retriever.k == 5
     assert loaded.sub_to_flow == SUBS
+
+
+def test_should_promote_replaces_a_champion_on_an_older_category_list():
+    from support_categorizer.registry import should_promote
+
+    assert should_promote(0.6, 0.8, new_taxonomy=3, champion_taxonomy=2)  # stale champion
+    assert not should_promote(0.6, 0.8, new_taxonomy=3, champion_taxonomy=3)
+    assert not should_promote(0.6, 0.8, new_taxonomy=3, champion_taxonomy=None)  # untagged: the score decides

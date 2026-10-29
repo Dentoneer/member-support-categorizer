@@ -41,6 +41,7 @@ class GuidelineRetriever:
         self.k = k
         self.client_factory = client_factory
         self._client = None
+        self.failures = 0
 
     def __getstate__(self):
         state = dict(self.__dict__)
@@ -71,7 +72,9 @@ class GuidelineRetriever:
         try:
             return format_guidelines(self.hits(transcript))
         except Exception as e:  # noqa: BLE001 - retrieval must never stop a batch
-            print(f"(retrieval failed, continuing without guidelines: {str(e)[:120]})")
+            self.failures += 1
+            if self.failures == 1:  # say it once, not once per call
+                print(f"(retrieval failed, continuing without guidelines: {str(e)[:160]})")
             return ""
 
 
@@ -79,13 +82,19 @@ def ensure_endpoint(w, name: str = VS_ENDPOINT) -> str:
     """Our endpoint if it exists; else any existing one (Free Edition allows one); else create it."""
     from databricks.sdk.service.vectorsearch import EndpointType
 
-    existing = [e.name for e in w.vector_search_endpoints.list_endpoints()]
-    if name in existing:
-        return name
-    if existing:
-        print(f"Reusing the existing Vector Search endpoint '{existing[0]}' (Free Edition allows one).")
-        return existing[0]
-    w.vector_search_endpoints.create_endpoint(name=name, endpoint_type=EndpointType.STANDARD)
+    try:
+        existing = [e.name for e in w.vector_search_endpoints.list_endpoints()]
+        if name in existing:
+            return name
+        if existing:
+            print(f"Reusing the existing Vector Search endpoint '{existing[0]}' (Free Edition allows one).")
+            return existing[0]
+        w.vector_search_endpoints.create_endpoint(name=name, endpoint_type=EndpointType.STANDARD)
+    except Exception as e:  # noqa: BLE001
+        raise UserFacingError(
+            f"Could not set up the Vector Search endpoint ({str(e)[:200]}). Check Compute > AI Search (Vector "
+            "Search) in the left bar; if an endpoint is listed as failed, delete it and rerun this cell."
+        ) from None
     print(f"Creating Vector Search endpoint '{name}' (takes 5-15 minutes the first time).")
     return name
 
@@ -104,12 +113,19 @@ def _wait(check: Callable[[], tuple[bool, str]], what: str, timeout: float, poll
         sleep(poll)
 
 
+ENDPOINT_FAILED = {"OFFLINE", "RED_STATE", "STOPPED", "DELETED"}
+
+
 def wait_endpoint(w, name: str, timeout: float = 1800, poll: float = 30,
                   sleep=time.sleep, now=time.time) -> None:
     def check():
         st = w.vector_search_endpoints.get_endpoint(name).endpoint_status
         state = getattr(getattr(st, "state", None), "value", str(getattr(st, "state", "unknown")))
-        return state == "ONLINE", state
+        msg = getattr(st, "message", None) or ""
+        if state in ENDPOINT_FAILED:  # waiting will not fix these
+            raise UserFacingError(f"Vector Search endpoint '{name}' is {state}: {msg or 'no details'}. "
+                                  "Open Compute > AI Search to see why (delete and rerun if it failed).")
+        return state == "ONLINE", f"{state} {msg}".strip()
 
     _wait(check, f"Vector Search endpoint '{name}'", timeout, poll, sleep, now)
 
@@ -117,6 +133,7 @@ def wait_endpoint(w, name: str, timeout: float = 1800, poll: float = 30,
 def ensure_index(w, index_name: str, endpoint: str, source_table: str,
                  embedding_endpoint: str = EMBEDDING_ENDPOINT) -> str:
     """Create the Delta Sync index, or trigger a sync of the existing one. Returns what it did."""
+    from databricks.sdk.errors import NotFound
     from databricks.sdk.service.vectorsearch import (
         DeltaSyncVectorIndexSpecRequest,
         EmbeddingSourceColumn,
@@ -126,31 +143,66 @@ def ensure_index(w, index_name: str, endpoint: str, source_table: str,
 
     try:
         idx = w.vector_search_indexes.get_index(index_name)
-    except Exception:  # noqa: BLE001 - not found -> create
+    except NotFound:
         idx = None
+    except Exception as e:  # noqa: BLE001 - permissions, transient errors: don't try to re-create
+        raise UserFacingError(f"Could not read the index {index_name} ({str(e)[:200]}). Rerun this cell; if it "
+                              "keeps failing, check the index in Catalog > workspace > support.") from None
     if idx is None:
-        w.vector_search_indexes.create_index(
-            name=index_name, endpoint_name=endpoint, primary_key="secondary_category",
-            index_type=VectorIndexType.DELTA_SYNC,
-            delta_sync_index_spec=DeltaSyncVectorIndexSpecRequest(
-                source_table=source_table, pipeline_type=PipelineType.TRIGGERED,
-                embedding_source_columns=[EmbeddingSourceColumn(
-                    name="guideline_text", embedding_model_endpoint_name=embedding_endpoint)]))  # fmt: skip
+        try:
+            w.vector_search_indexes.create_index(
+                name=index_name, endpoint_name=endpoint, primary_key="secondary_category",
+                index_type=VectorIndexType.DELTA_SYNC,
+                delta_sync_index_spec=DeltaSyncVectorIndexSpecRequest(
+                    source_table=source_table, pipeline_type=PipelineType.TRIGGERED,
+                    embedding_source_columns=[EmbeddingSourceColumn(
+                        name="guideline_text", embedding_model_endpoint_name=embedding_endpoint)]))  # fmt: skip
+        except Exception as e:  # noqa: BLE001
+            raise UserFacingError(f"Could not create the Vector Search index ({str(e)[:250]}).") from None
         return "created"
-    if getattr(getattr(idx, "status", None), "ready", False):
+    if not getattr(getattr(idx, "status", None), "ready", False):
+        return "still building (first sync running)"
+    try:
         w.vector_search_indexes.sync_index(index_name)
-        return "synced"
-    return "still building (first sync running)"
+    except Exception as e:  # noqa: BLE001
+        text = str(e).lower()
+        if "already" in text or "in progress" in text or "running" in text:
+            return "sync already running"
+        raise UserFacingError(f"Could not sync the index ({str(e)[:250]}). Rerun this cell.") from None
+    return "synced"
+
+
+def index_keys(w, index_name: str, limit: int) -> set[str]:
+    """The categories currently in the index (a broad query returning every row)."""
+    resp = w.vector_search_indexes.query_index(index_name=index_name, columns=["secondary_category"],
+                                               query_text="customer support request",
+                                               num_results=limit)  # fmt: skip
+    names = [c.name for c in resp.manifest.columns]
+    col = names.index("secondary_category")
+    return {row[col] for row in ((resp.result.data_array if resp.result else None) or [])}
 
 
 def wait_index(w, index_name: str, expected_rows: int, timeout: float = 1800, poll: float = 30,
-               sleep=time.sleep, now=time.time) -> None:
-    """Ready and holding every guideline row."""
+               sleep=time.sleep, now=time.time, expected_keys: set[str] | None = None,
+               keys_fn: Callable[[], set[str]] | None = None) -> None:
+    """Ready, holding every guideline row, and (if given) exactly the expected categories, so a
+    rename or a new category is really searchable before we use the index."""
+    if expected_keys is not None and keys_fn is None:
+        def keys_fn():
+            return index_keys(w, index_name, max(len(expected_keys) + 20, 100))
 
     def check():
         st = w.vector_search_indexes.get_index(index_name).status
         n = getattr(st, "indexed_row_count", None) or 0
         ready = bool(getattr(st, "ready", False))
-        return ready and n >= expected_rows, f"ready={ready}, {n}/{expected_rows} rows indexed"
+        msg = getattr(st, "message", None) or ""
+        if "fail" in msg.lower():  # a failed sync pipeline will not fix itself
+            raise UserFacingError(f"The index sync failed: {msg[:300]}. Fix the cause, then rerun this cell.")
+        ok = ready and n >= expected_rows
+        if ok and expected_keys is not None:
+            missing = expected_keys - keys_fn()
+            if missing:
+                return False, f"ready, waiting for {len(missing)} new/renamed categories to be indexed"
+        return ok, f"ready={ready}, {n}/{expected_rows} rows indexed {msg[:80]}".strip()
 
     _wait(check, f"Index '{index_name}'", timeout, poll, sleep, now)

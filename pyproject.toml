@@ -17,7 +17,7 @@ app = ["streamlit", "databricks-sql-connector", "databricks-sdk"]
 where = ["src"]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 extend-exclude = ["notebooks"]  # Databricks source notebooks use MAGIC cells; see tools/check_notebooks
 
 [tool.pytest.ini_options]

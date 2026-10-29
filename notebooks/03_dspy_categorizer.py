@@ -129,7 +129,7 @@ display(pd.DataFrame(result))  # noqa: F821
 
 from support_categorizer.categorizer import examples_from, optimize
 from support_categorizer.registry import (
-    champion_score,
+    champion_info,
     model_resources,
     promote,
     register_program,
@@ -158,9 +158,9 @@ write_metrics(spark, s, result)  # noqa: F821
 display(pd.DataFrame(result))  # noqa: F821
 score = next(r["value"] for r in result if r["metric"] == "secondary_accuracy")
 if reg.get("version"):  # champion/challenger: only a more accurate version takes over
-    tag_score(s, reg["version"], score)
-    current = champion_score(s)
-    if should_promote(score, current):
+    tag_score(s, reg["version"], score, taxonomy_version=tv)
+    current, current_tv = champion_info(s)
+    if should_promote(score, current, new_taxonomy=tv, champion_taxonomy=current_tv):
         promote(s, reg["version"])
     else:
         print(f"Kept the current champion ({current:.1%}); this version scored {score:.1%}.")

@@ -36,4 +36,4 @@ Phase 2 of `../cfpb-nlp-classifier` (that project's lessons: noisy labels; basel
 ## Conventions
 - Marco is non-technical: every failure path raises `UserFacingError` with a plain-English fix.
 - Tests: `pytest -q` (Spark tests need Java; locally run them in Docker image `msc-spark`, in CI they
-  run on ubuntu). `ruff check .` (line length 110). `python -m support_categorizer.tools.check_notebooks notebooks app`.
+  run on ubuntu). `ruff check .` (line length 120). `python -m support_categorizer.tools.check_notebooks notebooks app`.

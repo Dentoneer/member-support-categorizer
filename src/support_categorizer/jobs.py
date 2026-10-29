@@ -25,7 +25,7 @@ def job_tasks(notebooks_dir: str, s: Settings) -> list:
              notebook_task=NotebookTask(notebook_path=f"{notebooks_dir.rstrip('/')}/{nb}",
                                         base_parameters={**params, **extra}),
              depends_on=[TaskDependency(task_key=d) for d in deps] or None,
-             max_retries=1, timeout_seconds=3600)
+             max_retries=1, timeout_seconds=7200)
         for key, (nb, deps, extra) in TASKS.items()
     ]  # fmt: skip
 

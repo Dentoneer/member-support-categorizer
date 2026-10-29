@@ -175,5 +175,7 @@ def write_guidelines(spark, s: Settings, pdf: pd.DataFrame) -> None:
     df = spark.createDataFrame(pdf[["secondary_category", "primary_category", "guideline_text", "source"]],
                                schema=GUIDELINES_DDL.replace(" NOT NULL", ""))  # fmt: skip
     merge_into(spark, df, table, ["secondary_category"])
+    if not len(pdf):
+        return
     keep = ", ".join(sql_str(x) for x in pdf["secondary_category"])
     spark.sql(f"DELETE FROM {table} WHERE secondary_category NOT IN ({keep})")

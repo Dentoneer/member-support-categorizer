@@ -86,7 +86,9 @@ def test_wait_index_until_all_rows():
 
 def test_ensure_index_creates_then_syncs():
     made, synced = [], []
-    missing = NS(vector_search_indexes=NS(get_index=lambda n: (_ for _ in ()).throw(RuntimeError("404")),
+    from databricks.sdk.errors import NotFound
+
+    missing = NS(vector_search_indexes=NS(get_index=lambda n: (_ for _ in ()).throw(NotFound("404")),
                                           create_index=lambda **kw: made.append(kw)))
     assert ensure_index(missing, "c.s.idx", "support-vs", "c.s.category_guidelines") == "created"
     assert made[0]["primary_key"] == "secondary_category"
@@ -96,3 +98,82 @@ def test_ensure_index_creates_then_syncs():
     ready = NS(vector_search_indexes=NS(get_index=lambda n: NS(status=NS(ready=True)),
                                         sync_index=lambda n: synced.append(n)))
     assert ensure_index(ready, "c.s.idx", "support-vs", "t") == "synced" and synced == ["c.s.idx"]
+
+
+# ---- review fixes -------------------------------------------------------------------------
+
+
+def test_ensure_index_only_treats_not_found_as_missing():
+    from databricks.sdk.errors import NotFound, PermissionDenied
+
+    made = []
+    w = NS(vector_search_indexes=NS(get_index=lambda n: (_ for _ in ()).throw(NotFound("no index")),
+                                    create_index=lambda **kw: made.append(kw)))
+    assert ensure_index(w, "c.s.idx", "support-vs", "t") == "created"
+    denied = NS(vector_search_indexes=NS(get_index=lambda n: (_ for _ in ()).throw(PermissionDenied("nope")),
+                                         create_index=lambda **kw: made.append("BAD")))
+    with pytest.raises(UserFacingError, match="Could not read"):
+        ensure_index(denied, "c.s.idx", "support-vs", "t")
+    assert "BAD" not in made
+
+
+def test_ensure_index_create_failure_is_plain_english():
+    from databricks.sdk.errors import NotFound
+
+    def create(**kw):
+        raise RuntimeError("embedding endpoint does not exist")
+
+    w = NS(vector_search_indexes=NS(get_index=lambda n: (_ for _ in ()).throw(NotFound("x")), create_index=create))
+    with pytest.raises(UserFacingError, match="embedding endpoint does not exist"):
+        ensure_index(w, "c.s.idx", "support-vs", "t")
+
+
+def test_sync_already_running_is_not_an_error():
+    def sync(n):
+        raise RuntimeError("A sync is already in progress for this index")
+
+    w = NS(vector_search_indexes=NS(get_index=lambda n: NS(status=NS(ready=True)), sync_index=sync))
+    assert "already" in ensure_index(w, "c.s.idx", "support-vs", "t")
+
+
+def test_ensure_endpoint_errors_are_plain_english():
+    def boom():
+        raise RuntimeError("quota exceeded")
+
+    with pytest.raises(UserFacingError, match="Vector Search"):
+        ensure_endpoint(NS(vector_search_endpoints=NS(list_endpoints=boom)))
+
+
+def test_wait_endpoint_fails_fast_on_terminal_state():
+    st = NS(state=NS(value="RED_STATE"), message="disk failure")
+    w = NS(vector_search_endpoints=NS(get_endpoint=lambda n: NS(endpoint_status=st)))
+    calls = []
+    with pytest.raises(UserFacingError, match="disk failure"):
+        wait_endpoint(w, "support-vs", sleep=lambda s: calls.append(s))
+    assert calls == []  # no waiting
+
+
+def test_wait_index_waits_for_the_new_keys_and_reports_failures():
+    keys = iter([{"cost"}, {"shipping_cost"}])
+    states = NS(ready=True, indexed_row_count=1, message="")
+    w = NS(vector_search_indexes=NS(get_index=lambda n: NS(status=states)))
+    seen = []
+    wait_index(w, "i", 1, expected_keys={"shipping_cost"}, keys_fn=lambda: next(keys),
+               sleep=lambda s: seen.append(s))
+    assert len(seen) == 1  # waited once for the rename to show up
+    failed = NS(vector_search_indexes=NS(get_index=lambda n: NS(status=NS(
+        ready=False, indexed_row_count=0, message="Pipeline FAILED: source table missing CDF"))))
+    with pytest.raises(UserFacingError, match="source table missing CDF"):
+        wait_index(failed, "i", 1, sleep=lambda s: None)
+
+
+def test_retriever_prints_failure_once():
+    import io
+    from contextlib import redirect_stdout
+
+    bad = GuidelineRetriever("i", client_factory=lambda: NS(vector_search_indexes=_Indexes(fail=True)))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        for _ in range(5):
+            bad("Customer: x")
+    assert buf.getvalue().count("retrieval failed") == 1 and bad.failures == 5

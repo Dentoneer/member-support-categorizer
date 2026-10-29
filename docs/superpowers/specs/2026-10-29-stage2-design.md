@@ -70,6 +70,9 @@ ai_query scored 69.3% / 69.3% / 67.7%.
   notebook paths.
 - Tasks: `ingest` (01), then in parallel `baseline` (02) and `guidelines` (08 in `index_only` mode:
   rebuild the guidelines table and sync the index), then `batch_ai_query` (05).
+- Also a `governance` task (07) after ingest (Claude's call, review round): 01 drops the
+  `customer_tier` mask to rewrite silver, so the job must re-apply it. `batch_ai_query` waits for
+  the index sync only to keep the run order simple.
 - Serverless compute (no cluster spec), `max_retries=1`. Catalog and schema are passed as base
   parameters. Runs once now and prints the run URL. It also prints how to add a schedule (not
   scheduled by default, to save Free Edition compute; Claude's call).

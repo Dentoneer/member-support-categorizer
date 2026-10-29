@@ -76,9 +76,15 @@ def model_resources(llm_endpoint: str, index_name: str | None = None) -> list:
     return res
 
 
-def should_promote(challenger_score: float, champion_score: float | None) -> bool:
-    """The challenger replaces the champion only if it is strictly more accurate."""
-    return champion_score is None or challenger_score > champion_score
+def should_promote(challenger_score: float, champion_score: float | None,
+                   new_taxonomy: int | None = None, champion_taxonomy: int | None = None) -> bool:
+    """The challenger replaces the champion if it is strictly more accurate, or if the champion was
+    trained on an older category list (it cannot produce the new categories at all)."""
+    if champion_score is None:
+        return True
+    if new_taxonomy is not None and champion_taxonomy is not None and new_taxonomy > champion_taxonomy:
+        return True
+    return challenger_score > champion_score
 
 
 def promote(s: Settings, version: str) -> None:
@@ -88,18 +94,27 @@ def promote(s: Settings, version: str) -> None:
     print(f"Version {version} is now the champion.")
 
 
-def tag_score(s: Settings, version: str, score: float) -> None:
+def tag_score(s: Settings, version: str, score: float, taxonomy_version: int | None = None) -> None:
     mlflow.set_registry_uri("databricks-uc")
-    mlflow.MlflowClient().set_model_version_tag(s.fqn(MODEL_NAME), version, "secondary_accuracy",
-                                                f"{score:.4f}")  # fmt: skip
+    client = mlflow.MlflowClient()
+    client.set_model_version_tag(s.fqn(MODEL_NAME), version, "secondary_accuracy", f"{score:.4f}")
+    if taxonomy_version is not None:
+        client.set_model_version_tag(s.fqn(MODEL_NAME), version, "taxonomy_version", str(int(taxonomy_version)))
 
 
 def champion_score(s: Settings, fallback: float | None = None) -> float | None:
     """The champion version's stored score; `fallback` (e.g. from the metrics table) if untagged."""
+    return champion_info(s, fallback)[0]
+
+
+def champion_info(s: Settings, fallback: float | None = None) -> tuple[float | None, int | None]:
+    """(score, category-list version) of the current champion; (fallback, None) if unknown."""
     try:
         mlflow.set_registry_uri("databricks-uc")
         mv = mlflow.MlflowClient().get_model_version_by_alias(s.fqn(MODEL_NAME), MODEL_ALIAS)
-        tag = (mv.tags or {}).get("secondary_accuracy")
-        return float(tag) if tag is not None else fallback
+        tags = mv.tags or {}
+        score = float(tags["secondary_accuracy"]) if "secondary_accuracy" in tags else fallback
+        tv = int(tags["taxonomy_version"]) if "taxonomy_version" in tags else None
+        return score, tv
     except Exception:  # noqa: BLE001 - no champion yet
-        return fallback
+        return fallback, None

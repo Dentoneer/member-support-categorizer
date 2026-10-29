@@ -40,11 +40,18 @@ def upsert_endpoint(w, s: Settings, version: str, name: str = SERVING_ENDPOINT) 
     from databricks.sdk.service.serving import AiGatewayConfig, EndpointCoreConfigInput
 
     try:
-        w.serving_endpoints.get(name)
-        exists = True
+        current = w.serving_endpoints.get(name)
     except Exception:  # noqa: BLE001 - not found
-        exists = False
-    if exists:
+        current = None
+    if current is not None:
+        def version_of(cfg):
+            ents = getattr(cfg, "served_entities", None) or []
+            return str(getattr(ents[0], "entity_version", "")) if ents else None
+
+        if version_of(getattr(current, "pending_config", None)) == str(version):
+            return f"already updating to version {version}"  # a rerun while the build is still going
+        if version_of(getattr(current, "config", None)) == str(version):
+            return f"already serving version {version}"  # nothing to rebuild
         w.serving_endpoints.update_config(name=name, served_entities=[served_entity(s, version)])
         try:
             w.serving_endpoints.put_ai_gateway(name=name, inference_table_config=inference_table(s))
@@ -67,7 +74,7 @@ def wait_ready(w, name: str = SERVING_ENDPOINT, timeout: float = 2400, poll: flo
         st = w.serving_endpoints.get(name).state
         ready = getattr(getattr(st, "ready", None), "value", None)
         update = getattr(getattr(st, "config_update", None), "value", None)
-        if update == "UPDATE_FAILED":
+        if update in ("UPDATE_FAILED", "UPDATE_CANCELED"):
             raise UserFacingError(f"Serving endpoint '{name}' failed to start. Open Serving > {name} > "
                                   "Events/Logs for the reason (on Free Edition this is often a "
                                   "serving limit).")  # fmt: skip

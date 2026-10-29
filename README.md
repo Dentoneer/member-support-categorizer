@@ -66,6 +66,8 @@ After a **Pull** of the Git folder, run these in order (Run all):
 
 Then redeploy the app (it now opens on the most accurate model).
 
+**After approving category changes in the app:** rerun **03 and then 08**. 03 retrains on the new list (a champion trained on an older list is always replaced); 08 rebuilds the guidelines and index and brings RAG back. The first job run (06) can take up to ~1 hour if 08 has never run before (it waits for Vector Search); a task that times out is retried once automatically.
+
 ### 3. Deploy the review app (once, ~5 minutes)
 1. **+ New** → **App** (Apps also live in the app switcher, the grid icon at the top right) →
    **Create a custom app**. Name: `support-review`.

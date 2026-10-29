@@ -93,7 +93,7 @@ index_name = s.fqn(GUIDELINES_INDEX)
 endpoint = ensure_endpoint(w)
 wait_endpoint(w, endpoint)
 print(f"Index: {ensure_index(w, index_name, endpoint, s.fqn(GUIDELINES))}")
-wait_index(w, index_name, expected_rows=len(rows))
+wait_index(w, index_name, expected_rows=len(rows), expected_keys=set(rows["secondary_category"]))
 print(f"Index {index_name} is ready with {len(rows)} guidelines.")
 if MODE == "index_only":
     dbutils.notebook.exit("guidelines table rebuilt and index synced")  # noqa: F821
@@ -127,15 +127,21 @@ train = silver[silver["split"] == "train"].sample(n=200, random_state=EVAL_SEED)
 retriever = GuidelineRetriever(index_name, k=TOP_K)
 
 
+errors = []
+
+
 def labels_for(transcript):
     try:
         return [h["secondary_category"] for h in retriever.hits(transcript)]
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        errors.append(str(e)[:200])
         return []
 
 
 with ThreadPoolExecutor(max_workers=4) as pool:
     retrieved = list(pool.map(labels_for, sample["call_transcript"]))
+if errors:
+    print(f"{len(errors)} retrieval queries failed (counted as misses). First error: {errors[0]}")
 recall = recall_at_k(retrieved, list(sample["secondary_category"]))
 write_metrics(spark, s, [{"model": "vector_search", "metric": f"retrieval_recall_at_{TOP_K}",  # noqa: F821
                           "value": recall, "n": len(sample)}])
@@ -179,7 +185,7 @@ display(pd.DataFrame(result))  # noqa: F821
 
 from support_categorizer.categorizer import examples_from, optimize
 from support_categorizer.registry import (
-    champion_score,
+    champion_info,
     model_resources,
     promote,
     register_program,
@@ -196,7 +202,8 @@ with mlflow.start_run(run_name="dspy_rag") as run:
     example = {"call_transcript": records[0]["call_transcript"],
                "customer_tier": records[0]["customer_tier"], "guidelines": ""}
     reg = register_program(optimized, s, example, alias=CHALLENGER_ALIAS,
-                           resources=model_resources(s.llm_endpoint, index_name))
+                           resources=model_resources(s.llm_endpoint, index_name),
+                           fallback_path=s.volume_path("program_rag.json"))
     version = reg.get("version")
     preds = predict_rows(optimized, records, "dspy_rag", f"{version or 'file'}/tax{tv}", run.info.run_id, lm=lm)
     result = accuracy_rows(pd.DataFrame(preds), sample, "dspy_rag")
@@ -209,9 +216,9 @@ score = next(r["value"] for r in result if r["metric"] == "secondary_accuracy")
 old = spark.sql(f"SELECT max(value) AS v FROM {s.fqn('metrics')} "  # noqa: F821
                 "WHERE model = 'dspy_optimized' AND metric = 'secondary_accuracy'").first().v
 if version:
-    tag_score(s, version, score)
-    current = champion_score(s, fallback=old)
-    if should_promote(score, current):
+    tag_score(s, version, score, taxonomy_version=tv)
+    current, current_tv = champion_info(s, fallback=old)
+    if should_promote(score, current, new_taxonomy=tv, champion_taxonomy=current_tv):
         promote(s, version)
         print(f"Promoted: RAG {score:.1%} beats the champion's {current if current is None else f'{current:.1%}'}.")
     else:

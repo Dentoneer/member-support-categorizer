@@ -59,3 +59,22 @@ def test_wait_ready_success_failure_timeout():
 def test_serving_payload():
     assert serving_payload([{"call_transcript": "t", "customer_tier": "gold", "x": 1}]) == [
         {"call_transcript": "t", "customer_tier": "gold", "guidelines": ""}]
+
+
+def test_rerun_with_same_version_does_not_rebuild():
+    calls = []
+    cur = NS(config=NS(served_entities=[NS(entity_version="4")]), pending_config=None)
+    w = NS(serving_endpoints=NS(get=lambda n: cur, update_config=lambda **kw: calls.append("update"),
+                                put_ai_gateway=lambda **kw: calls.append("gateway")))
+    assert upsert_endpoint(w, Settings(), "4") == "already serving version 4"
+    assert "update" not in calls
+    pending = NS(config=NS(served_entities=[NS(entity_version="3")]),
+                 pending_config=NS(served_entities=[NS(entity_version="4")]))
+    w2 = NS(serving_endpoints=NS(get=lambda n: pending, update_config=lambda **kw: calls.append("update2")))
+    assert "already updating" in upsert_endpoint(w2, Settings(), "4") and "update2" not in calls
+
+
+def test_wait_ready_canceled_fails_fast():
+    canceled = NS(serving_endpoints=NS(get=lambda n: _state("NOT_READY", "UPDATE_CANCELED")))
+    with pytest.raises(UserFacingError, match="failed to start"):
+        wait_ready(canceled, sleep=lambda s: None)
