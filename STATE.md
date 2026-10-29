@@ -1,6 +1,6 @@
 # STATE
 
-_Last updated: 2026-10-29_
+_Last updated: 2026-10-29 (overnight stage 2 build; final review in progress, then PR)_
 
 ## Current status
 - **Stage 1 merged (PR #1, #2) and run live on Marco's Free Edition (2026-10-28).** 00-05 + 07 ran;
