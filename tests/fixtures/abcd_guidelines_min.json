@@ -1,0 +1,327 @@
+{
+ "Product Defect": {
+  "description": "refunds and returns",
+  "subflows": {
+   "Initiate Refund": {
+    "instructions": [
+     "Start by asking for the refund reason.  Then, to complete the refund, perform the following actions"
+    ]
+   },
+   "Update Refund": {
+    "instructions": [
+     "The customer is adding an extra item to their existing refund.  If you have not yet gotten it, ask the customer for their reason for refunding."
+    ]
+   },
+   "Refund Status": {
+    "instructions": [
+     "Customers want to know the status and payment method of their refund.  In this case:"
+    ]
+   },
+   "Return Due to Stain": {
+    "instructions": [
+     "In all three cases for return, follow the same set of actions:"
+    ]
+   },
+   "Return Due to Color": {
+    "instructions": [
+     "In all three cases for return, follow the same set of actions:"
+    ]
+   },
+   "Return Due to Size": {
+    "instructions": [
+     "In all three cases for return, follow the same set of actions:"
+    ]
+   }
+  }
+ },
+ "Order Issue": {
+  "description": "get status of an order or change an order, possibly shipping",
+  "subflows": {
+   "Status Mystery Fee": {
+    "instructions": [
+     "The customer believes an extra charge has been added to their order."
+    ]
+   },
+   "Status Delivery Time": {
+    "instructions": [
+     "The customer believes the delivery time is wrong and wants to move from morning to evening.  If the customer is just confirming a date, then the flow might be Shipping Issue > Status instead."
+    ]
+   },
+   "Status Payment Method": {
+    "instructions": [
+     "The customer believes the payment method is wrong.  Valid payment methods are credit card, debit card and PayPal.  The customer may want to change their payment method."
+    ]
+   },
+   "Status Quantity": {
+    "instructions": [
+     "The email confirmation of the order does not match the desired order quantity."
+    ]
+   },
+   "Manage Upgrade": {
+    "instructions": [
+     "The customer wants to upgrade to overnight shipping."
+    ]
+   },
+   "Manage Downgrade": {
+    "instructions": [
+     "The customer wants to downgrade to next week delivery to save on shipping fees.  If the customer wants a refund it is likely Shipping Issue > Shipping Cost instead."
+    ]
+   },
+   "Manage Create": {
+    "instructions": [
+     "The customer wants to add something to their existing order."
+    ]
+   },
+   "Manage Cancel": {
+    "instructions": [
+     "The customer accidentally ordered two items when they meant to order just one."
+    ]
+   }
+  }
+ },
+ "Account Access": {
+  "description": "username, password, and two-factor authentication",
+  "subflows": {
+   "Recover Username": {
+    "instructions": [
+     "To get their username, you must"
+    ]
+   },
+   "Recover Password": {
+    "instructions": [
+     "Help the customer get a new password"
+    ]
+   },
+   "Reset Two-Factor Auth": {
+    "instructions": [
+     "Let the customer know that to reset, you will be sending a special code to their email.  To proceed:"
+    ]
+   }
+  }
+ },
+ "Troubleshoot Site": {
+  "description": "website slow, search not working, credit card, cart not updating",
+  "subflows": {
+   "Invalid Credit Card": {
+    "instructions": [
+     "Customer’s credit card keeps getting rejected and is considered invalid.  Choose these in any order."
+    ]
+   },
+   "Cart Not Updating": {
+    "instructions": [
+     "The customer is trying to place an item in their shopping cart, but the cart is not updating.  Choose actions in any order you want."
+    ]
+   },
+   "Search Not Working": {
+    "instructions": [
+     "The search results keep showing 'No results found' no matter what the customer searches for.  Shuffle up the order in which you choose these actions."
+    ]
+   },
+   "Website Too Slow": {
+    "instructions": [
+     "The acmecorp.com website has slowed down to a crawl, making it unusable.  Pick these actions in any order you wish.  Feel free to be creative."
+    ]
+   }
+  }
+ },
+ "Manage Account": {
+  "description": "subscription service added or removed, change profile info",
+  "subflows": {
+   "Status Service Added": {
+    "instructions": [
+     "The customer believes that an unknown service was added to their account."
+    ]
+   },
+   "Status Service Removed": {
+    "instructions": [
+     "The customer believes that an important service was mistakenly removed from their plan."
+    ]
+   },
+   "Status Shipping Question": {
+    "instructions": [
+     "Customer has a question about their account.  Namely, they want to know if the account allows them free shipping to/ from out of the country. This might be also phrased as international shipping."
+    ]
+   },
+   "Status Credit Missing": {
+    "instructions": [
+     "Some credit is missing from the customer’s account."
+    ]
+   },
+   "Manage Change Address": {
+    "instructions": [
+     "The customer wants to manage their address."
+    ]
+   },
+   "Manage Change Name": {
+    "instructions": [
+     "The customer wants to manage their name."
+    ]
+   },
+   "Manage Change Phone": {
+    "instructions": [
+     "The customer wants to manage their phone number."
+    ]
+   },
+   "Manage Payment Method": {
+    "instructions": [
+     "The customer wants to manage their payment method."
+    ]
+   }
+  }
+ },
+ "Purchase Dispute": {
+  "description": "bad price, out of stock, promo codes, billing",
+  "subflows": {
+   "Bad Price Competitor": {
+    "instructions": [
+     "The customer is calling in to call about a bad price.   The customer will give the reason the competitor has a better price."
+    ]
+   },
+   "Bad Price Yesterday": {
+    "instructions": [
+     "The customer is calling in to call about a bad price.   The customer will give the reason yesterday’s price was lower."
+    ]
+   },
+   "Out-of-Stock General": {
+    "instructions": [
+     "The customer is calling in to call about items being out of stock"
+    ]
+   },
+   "Out-of-Stock One Item": {
+    "instructions": [
+     "The customer is calling in to call about one particular item being out of stock."
+    ]
+   },
+   "Promo Code Invalid": {
+    "instructions": [
+     "The customer is complaining about a promo code that is considered invalid.  Keep this reason in mind later for filling out the survey."
+    ]
+   },
+   "Promo Code Out of Date": {
+    "instructions": [
+     "The customer is complaining about a promo code that is considered out-of-date.  Keep this reason in mind later for filling out the survey."
+    ]
+   },
+   "Mistimed Billing Already Returned": {
+    "instructions": [
+     "The customer believes they have a problem on their bill.  They have already returned their item but have not received their credit.  If they want a refund, consider “Product Defect > Initiate Refund” instead."
+    ]
+   },
+   "Mistimed Billing Never Bought": {
+    "instructions": [
+     "The customer has a problem on their bill because they never bought anything in the first place."
+    ]
+   }
+  }
+ },
+ "Shipping Issue": {
+  "description": "check our update a shipment of an item",
+  "subflows": {
+   "Shipping Status": {
+    "instructions": [
+     "The customer wants to check up on the status of their shipment because they received an email notification that seems to imply something wrong. The customer will ask some sort of yes/no question in these scenarios, which you will answer."
+    ]
+   },
+   "Manage Shipping": {
+    "instructions": [
+     "The customer wants to change or update something about their shipment -- either changing address or change order because they ordered the wrong item.  If they want to cancel because the cost is too high, check the 'Shipping Cost' flow below."
+    ]
+   },
+   "Missing Item": {
+    "instructions": [
+     "The customer didn’t receive their item and wants to know what happened."
+    ]
+   },
+   "Shipping Cost": {
+    "instructions": [
+     "The cost of shipping is too high, so the customer wants to get the shipping fee waived or get a refund of the shipment cost.   If an 'order' is mentioned, 'shipping cost' is probably not the right flow.   If the customer does not want a refund and instead wants to delay delivery, it is likely Order Issue > Manage > Downgrade instead."
+    ]
+   }
+  }
+ },
+ "Subscription Inquiry": {
+  "description": "billing and updates of the premium subscription service",
+  "subflows": {
+   "Status Active": {
+    "instructions": [
+     "The customer is wondering if their payment went through so that their subscription is still active"
+    ]
+   },
+   "Status Due Amount": {
+    "instructions": [
+     "The customer wants to know the amount due for their subscription."
+    ]
+   },
+   "Status Due Date": {
+    "instructions": [
+     "The customer wants to know the monthly renewal date for their subscription."
+    ]
+   },
+   "Manage Pay Bill": {
+    "instructions": [
+     "Customer wants to pay or renew their subscription"
+    ]
+   },
+   "Manage Extension": {
+    "instructions": [
+     "Customer cannot pay for their premium subscription and wants to ask for an extension."
+    ]
+   },
+   "Manage Dispute Bill": {
+    "instructions": [
+     "The customer thinks something is wrong with their subscription bill, such that they were billed twice."
+    ]
+   }
+  }
+ },
+ "Single-Item Query": {
+  "description": "FAQ questions about jeans, boots, shirt or sweater",
+  "subflows": {
+   "Boots FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking"
+    ]
+   },
+   "Shirt FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking:"
+    ]
+   },
+   "Jeans FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking:"
+    ]
+   },
+   "Jacket FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking:"
+    ]
+   }
+  }
+ },
+ "Storewide Query": {
+  "description": "FAQ questions about pricing, timing, membership or features",
+  "subflows": {
+   "Pricing FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking:"
+    ]
+   },
+   "Membership FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking:"
+    ]
+   },
+   "Timing FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking:"
+    ]
+   },
+   "Policy FAQ": {
+    "instructions": [
+     "The main effort is in figuring out which question the customer is asking:"
+    ]
+   }
+  }
+ }
+}
