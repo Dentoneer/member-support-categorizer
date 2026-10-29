@@ -1,6 +1,6 @@
 # STATE
 
-_Last updated: 2026-10-29 (overnight stage 2 build done; reviewed + fixed; PR open for Marco)_
+_Last updated: 2026-10-29 (stage 2 merged; learning walkthrough started; protect-main ruleset added)_
 
 ## Current status
 - **Stage 1 merged (PR #1, #2) and run live on Marco's Free Edition (2026-10-28).** 00-05 + 07 ran;
@@ -28,6 +28,15 @@ _Last updated: 2026-10-29 (overnight stage 2 build done; reviewed + fixed; PR op
   fail fast on failed endpoint/index, wait for renamed keys in the index, champion replaced when
   trained on an older taxonomy version, serving rerun doesn't rebuild). 130 tests + 9 Spark pass.
 
+- **Stage 2 live run (2026-10-29), 03 + 08 done:** 03 rerun with PII rule: zero-shot .687, optimized
+  .657 (kept champion 68.0%), summary_pii_rate ~4%. **08 RAG works:** dspy_rag_zero_shot .787/.867,
+  dspy_rag (BootstrapFewShot) .823/.890 (valid .997, PII .037), recall@8 92.0%, promoted to champion (UC version 4); baseline still .913/.960. Gap to baseline 23 -> 9 pts.
+  04 on dspy_rag: Jev AUROC .671 (was .784 on the weaker model), auto-accept 58% at 89% correct, sent to
+  human 42% at 74%; regex PII 4%. MLflow eval (50 calls): values .74/.76/.96/.80/.30 (names were hidden by
+  display(); fixed). Suspect the `summary_no_personal_data` Guidelines judge (~.30) is over-strict vs regex
+  (.96): check its reasoning in the Evaluations tab.
+  Still to run: 05, 07, 06, 09, app redeploy.
+
 ## Recent decisions
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
 - Two stages: stage 1 = core + Jev + UC governance + app (Marco moved those in); stage 2 = RAG
@@ -44,7 +53,9 @@ _Last updated: 2026-10-29 (overnight stage 2 build done; reviewed + fixed; PR op
 - Watch on first live run: VS endpoint provisioning time / Free Edition limit, query_index response
   shape, mlflow.dspy log with resources, serving custom model on Free Edition, ai_query on a custom
   endpoint, job notebook paths.
-- Add a `protect-main` ruleset like the CFPB repo (PR + `lint-and-test` check) if Marco wants it.
+- `protect-main` ruleset active (2026-10-29): PR + 1 approval + `lint-and-test` on main; admin (Marco) can bypass.
+  Collaborator Karoltrojacek (write) must go through PRs that Marco approves.
+- Learning walkthrough in progress (cell by cell, line by line): done 00 (`checks.py`); next 01_ingest.
 - Local Spark testing: Docker image `msc-spark` (Dockerfile was in the session scratchpad; recreate:
   python:3.12-slim + openjdk-21-jre-headless + pyspark 4.0.1 / delta-spark 4.0.0).
 - Add to sites-hub (controller).
