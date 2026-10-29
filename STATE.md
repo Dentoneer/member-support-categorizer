@@ -42,7 +42,9 @@ _Last updated: 2026-10-29 (stage 2 merged; learning walkthrough started; protect
   05 ai_query .653/.707 (valid 100%; yesterday .677, within noise).
   07 rerun OK (mask restored).
   06 job created and first run all green (job notebook paths work on serverless).
-  Still to run: 09, app redeploy.
+  09 serving WORKS on Free Edition (endpoint support-categorizer serving champion v4; ai_query on it OK).
+  Note: app default = best secondary_accuracy in metrics = baseline (no summaries); pick dspy_rag in the selector.
+  Still to do: app redeploy.
 
 ## Recent decisions
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
