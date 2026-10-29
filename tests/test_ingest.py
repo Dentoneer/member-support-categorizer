@@ -75,3 +75,17 @@ def test_silver_matches_python_twin(spark, tmp_path):
 
     row = silver_from_bronze(bronze_from_json(spark, _fixture(tmp_path))).where("call_id = '1'")
     assert row.first().call_transcript == build_transcript([tuple(t) for t in LONG])
+
+
+def test_download_failure_is_plain_english(tmp_path, monkeypatch):
+    import httpx
+
+    from support_categorizer.errors import UserFacingError
+    from support_categorizer.ingest import download_file
+
+    def boom(*a, **k):
+        raise httpx.ConnectError("blocked")
+
+    monkeypatch.setattr(httpx, "stream", boom)
+    with pytest.raises(UserFacingError, match="Upload to this volume"):
+        download_file("https://example.com/x.json", str(tmp_path / "x.json"), 10, "x.json")

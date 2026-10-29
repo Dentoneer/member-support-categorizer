@@ -21,6 +21,7 @@ from databricks.sdk.core import Config  # noqa: E402
 from support_categorizer.review import primary_volumes, volumes  # noqa: E402
 from support_categorizer.settings import Settings  # noqa: E402
 from support_categorizer.sql import (  # noqa: E402
+    best_model_sql,
     is_admin_sql,
     models_sql,
     override_insert_sql,
@@ -76,8 +77,10 @@ is_admin = bool(query(is_admin_sql(S), (("email", USER),))["ok"].iloc[0])
 st.title("Member-support call review")
 role = " (admin)" if is_admin else ""
 st.caption(f"Signed in as {USER}{role} · category list v{int(tax['version'].max())}")
-model = st.sidebar.selectbox("Model", models, index=models.index("dspy_optimized")
-                             if "dspy_optimized" in models else 0)  # fmt: skip
+best = query(best_model_sql(S))["model"].tolist()
+default = best[0] if best and best[0] in models else (models[0] if models else None)
+model = st.sidebar.selectbox("Model", models, index=models.index(default) if default else 0,
+                             help="Defaults to the most accurate model on the test sample.")
 tab_vol, tab_review, tab_req = st.tabs(["Categories & volumes", "Review & override", "Category requests"])
 
 # ---- 1. categories and their volumes ------------------------------------------------------

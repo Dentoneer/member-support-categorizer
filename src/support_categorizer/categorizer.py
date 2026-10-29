@@ -10,11 +10,14 @@ from typing import Literal
 import dspy
 import pandas as pd
 
+from support_categorizer.pii import SUMMARY_PII_RULE
+
 INSTRUCTION = (
     "Categorize a member-support conversation between a customer and an agent. Pick the "
     "secondary_category (the specific reason for contacting support) from the allowed list, and the "
     "primary_category it belongs to. Rate urgency from 1 (routine question) to 5 (urgent: money "
-    "lost, account locked, order stuck). Write a factual summary of at most 40 words."
+    "lost, account locked, order stuck). Write a factual summary of at most 40 words. "
+    + SUMMARY_PII_RULE
 )
 
 
@@ -27,7 +30,7 @@ def make_signature(flows: list[str], subflows: list[str]) -> type[dspy.Signature
         "primary_category": (Literal[tuple(flows)], dspy.OutputField()),
         "secondary_category": (Literal[tuple(subflows)], dspy.OutputField()),
         "urgency_score": (int, dspy.OutputField(desc="1 = routine ... 5 = urgent")),
-        "concise_summary": (str, dspy.OutputField(desc="at most 40 words")),
+        "concise_summary": (str, dspy.OutputField(desc="at most 40 words, no personal data")),
     }
     return dspy.make_signature(fields, INSTRUCTION, signature_name="CallCategorizer")
 
@@ -35,12 +38,15 @@ def make_signature(flows: list[str], subflows: list[str]) -> type[dspy.Signature
 class CallCategorizerProgram(dspy.Module):
     """ChainOfThought over CallCategorizer; primary is re-derived from the secondary category."""
 
-    def __init__(self, flows: list[str], sub_to_flow: dict[str, str]):
+    def __init__(self, flows: list[str], sub_to_flow: dict[str, str], retriever=None):
         super().__init__()
         self.sub_to_flow = dict(sub_to_flow)
+        self.retriever = retriever  # optional: transcript -> guidelines text (RAG, stage 2)
         self.categorize = dspy.ChainOfThought(make_signature(flows, sorted(sub_to_flow)))
 
     def forward(self, call_transcript: str, customer_tier: str, guidelines: str = ""):
+        if not guidelines and self.retriever is not None:
+            guidelines = self.retriever(call_transcript)
         pred = self.categorize(
             call_transcript=call_transcript, customer_tier=customer_tier, guidelines=guidelines
         )

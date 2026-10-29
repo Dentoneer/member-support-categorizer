@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from support_categorizer.pii import SUMMARY_PII_RULE
 from support_categorizer.settings import (
     APP_ADMINS,
     CALLS_CLEAN,
@@ -20,7 +21,7 @@ from support_categorizer.settings import (
 AI_QUERY_INSTRUCTION = (
     "You categorize member-support calls. Read the call and answer with a JSON object with keys "
     "primary_category, secondary_category (choose from the allowed values), urgency_score (integer "
-    "1 = routine to 5 = urgent) and concise_summary (at most 40 words)."
+    "1 = routine to 5 = urgent) and concise_summary (at most 40 words). " + SUMMARY_PII_RULE
 )
 OUTPUT_DDL = "primary_category STRING, secondary_category STRING, urgency_score INT, concise_summary STRING"
 
@@ -246,3 +247,10 @@ def needs_fallback(result) -> bool:
     if n == 0:
         return True
     return int(result["valid"].sum()) == 0 or result["error"].notna().sum() / n > 0.5
+
+
+def best_model_sql(s: Settings) -> str:
+    """The scored model with the highest sub-category accuracy (the app's default view)."""
+    return f"""SELECT m.model FROM {s.fqn(METRICS)} m
+WHERE m.metric = 'secondary_accuracy' AND m.model IN (SELECT DISTINCT model FROM {s.fqn(PREDICTIONS)})
+ORDER BY m.value DESC LIMIT 1"""

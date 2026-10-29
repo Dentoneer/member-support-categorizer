@@ -27,7 +27,13 @@ Phase 2 of `../cfpb-nlp-classifier` (that project's lessons: noisy labels; basel
 - LLM auth: LiteLLM signs in through the Databricks SDK (don't copy notebook tokens).
 - Public repo: no company names, no data, no emails (app admins live in UC table `app_admins`).
 
+- Stage 2: RAG over `category_guidelines` (Vector Search endpoint `support-vs`, index
+  `category_guidelines_index`); the DSPy program can carry a picklable `GuidelineRetriever`.
+  Registry: new versions register as `challenger` with a `secondary_accuracy` tag and take
+  `champion` only if better (`registry.should_promote`). Job `support-categorizer-refresh`
+  (notebook 06), serving endpoint `support-categorizer` (notebook 09).
+
 ## Conventions
 - Marco is non-technical: every failure path raises `UserFacingError` with a plain-English fix.
 - Tests: `pytest -q` (Spark tests need Java; locally run them in Docker image `msc-spark`, in CI they
-  run on ubuntu). `ruff check .` (line length 110). `python -m support_categorizer.tools.check_notebooks notebooks app`.
+  run on ubuntu). `ruff check .` (line length 120). `python -m support_categorizer.tools.check_notebooks notebooks app`.

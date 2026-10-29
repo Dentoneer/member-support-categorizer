@@ -78,3 +78,31 @@ def test_write_validations_nulls_and_rerun(spark):
     write_validations(spark, s, rows)
     write_validations(spark, s, rows)
     assert spark.table(s.fqn("validations")).count() == 1
+
+
+def test_accuracy_rows_adds_pii_rate_when_summaries_exist():
+    truth = pd.DataFrame({"call_id": ["1", "2"], "primary_category": ["p", "p"], "secondary_category": ["s", "s"]})
+    preds = pd.DataFrame({"call_id": ["1", "2"], "primary_category": ["p", "p"], "secondary_category": ["s", "s"],
+                          "valid": [True, True], "concise_summary": ["Gold member asks", "clean summary"]})
+    m = {r["metric"]: r["value"] for r in accuracy_rows(preds, truth, "m")}
+    assert m["summary_pii_rate"] == 0.5
+    no_sum = preds.drop(columns="concise_summary")
+    assert "summary_pii_rate" not in {r["metric"] for r in accuracy_rows(no_sum, truth, "m")}
+
+
+@pytest.mark.spark
+def test_write_guidelines_upserts_deletes_and_enables_cdf(spark):
+    from support_categorizer.settings import Settings
+    from support_categorizer.tables import write_guidelines
+
+    spark.sql("CREATE DATABASE IF NOT EXISTS sup")
+    s = Settings(catalog="spark_catalog", schema="sup")
+    rows = pd.DataFrame({"secondary_category": ["a", "b", "it's"], "primary_category": ["p"] * 3,
+                         "guideline_text": ["x", "y", "z"], "source": ["abcd"] * 3})
+    write_guidelines(spark, s, rows)
+    write_guidelines(spark, s, rows)
+    assert spark.table(s.fqn("category_guidelines")).count() == 3
+    write_guidelines(spark, s, rows.iloc[:2])
+    assert spark.table(s.fqn("category_guidelines")).count() == 2
+    props = {r.key: r.value for r in spark.sql(f"SHOW TBLPROPERTIES {s.fqn('category_guidelines')}").collect()}
+    assert props.get("delta.enableChangeDataFeed") == "true"

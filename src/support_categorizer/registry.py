@@ -13,17 +13,28 @@ from support_categorizer.settings import MODEL_ALIAS, MODEL_NAME, Settings
 PROGRAM_FILE = "program.json"
 
 
-def register_program(program, s: Settings, input_example: dict, fallback_path: str | None = None) -> dict:
-    """Inside an active MLflow run. Returns {"path": "uc", "version": v} or the Volume fallback."""
+def register_program(program, s: Settings, input_example: dict, fallback_path: str | None = None,
+                     alias: str = MODEL_ALIAS, resources: list | None = None,
+                     score: float | None = None) -> dict:
+    """Inside an active MLflow run. Returns {"path": "uc", "version": v} or the Volume fallback.
+
+    `alias` is "champion" (stage 1) or "challenger" (a candidate to compare). `resources` lists what
+    the model calls (LLM endpoint, Vector Search index) so Model Serving can pass credentials through.
+    `score` (eval-sample secondary accuracy) is stored as a version tag for champion/challenger.
+    """
     name = s.fqn(MODEL_NAME)
     try:
         mlflow.set_registry_uri("databricks-uc")
         pkg = os.path.dirname(os.path.abspath(__file__))  # so the model can import our code anywhere
         info = mlflow.dspy.log_model(program, name="model", input_example=input_example,
-                                     registered_model_name=name, code_paths=[pkg])  # fmt: skip
+                                     registered_model_name=name, code_paths=[pkg],
+                                     resources=resources)  # fmt: skip
         version = str(info.registered_model_version)
-        mlflow.MlflowClient().set_registered_model_alias(name, MODEL_ALIAS, version)
-        print(f"Registered {name} version {version} with alias '{MODEL_ALIAS}' in Unity Catalog.")
+        client = mlflow.MlflowClient()
+        client.set_registered_model_alias(name, alias, version)
+        if score is not None:
+            client.set_model_version_tag(name, version, "secondary_accuracy", f"{score:.4f}")
+        print(f"Registered {name} version {version} with alias '{alias}' in Unity Catalog.")
         return {"path": "uc", "version": version}
     except Exception as e:  # noqa: BLE001 - Free Edition limits: keep going with a file
         path = fallback_path or s.volume_path(PROGRAM_FILE)
@@ -53,3 +64,57 @@ def load_program(s: Settings, flows: list[str], sub_to_flow: dict[str, str],
         prog = CallCategorizerProgram(flows, sub_to_flow)
         prog.load(path)
         return prog
+
+
+def model_resources(llm_endpoint: str, index_name: str | None = None) -> list:
+    """What the registered program calls at inference time (for Model Serving auth passthrough)."""
+    from mlflow.models.resources import DatabricksServingEndpoint, DatabricksVectorSearchIndex
+
+    res = [DatabricksServingEndpoint(endpoint_name=llm_endpoint)]
+    if index_name:
+        res.append(DatabricksVectorSearchIndex(index_name=index_name))
+    return res
+
+
+def should_promote(challenger_score: float, champion_score: float | None,
+                   new_taxonomy: int | None = None, champion_taxonomy: int | None = None) -> bool:
+    """The challenger replaces the champion if it is strictly more accurate, or if the champion was
+    trained on an older category list (it cannot produce the new categories at all)."""
+    if champion_score is None:
+        return True
+    if new_taxonomy is not None and champion_taxonomy is not None and new_taxonomy > champion_taxonomy:
+        return True
+    return challenger_score > champion_score
+
+
+def promote(s: Settings, version: str) -> None:
+    """Move the `champion` alias to `version` (batch jobs and serving follow the alias)."""
+    mlflow.set_registry_uri("databricks-uc")
+    mlflow.MlflowClient().set_registered_model_alias(s.fqn(MODEL_NAME), MODEL_ALIAS, version)
+    print(f"Version {version} is now the champion.")
+
+
+def tag_score(s: Settings, version: str, score: float, taxonomy_version: int | None = None) -> None:
+    mlflow.set_registry_uri("databricks-uc")
+    client = mlflow.MlflowClient()
+    client.set_model_version_tag(s.fqn(MODEL_NAME), version, "secondary_accuracy", f"{score:.4f}")
+    if taxonomy_version is not None:
+        client.set_model_version_tag(s.fqn(MODEL_NAME), version, "taxonomy_version", str(int(taxonomy_version)))
+
+
+def champion_score(s: Settings, fallback: float | None = None) -> float | None:
+    """The champion version's stored score; `fallback` (e.g. from the metrics table) if untagged."""
+    return champion_info(s, fallback)[0]
+
+
+def champion_info(s: Settings, fallback: float | None = None) -> tuple[float | None, int | None]:
+    """(score, category-list version) of the current champion; (fallback, None) if unknown."""
+    try:
+        mlflow.set_registry_uri("databricks-uc")
+        mv = mlflow.MlflowClient().get_model_version_by_alias(s.fqn(MODEL_NAME), MODEL_ALIAS)
+        tags = mv.tags or {}
+        score = float(tags["secondary_accuracy"]) if "secondary_accuracy" in tags else fallback
+        tv = int(tags["taxonomy_version"]) if "taxonomy_version" in tags else None
+        return score, tv
+    except Exception:  # noqa: BLE001 - no champion yet
+        return fallback, None

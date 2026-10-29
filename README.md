@@ -15,7 +15,10 @@ list.
 | Model registry | Unity Catalog model `workspace.support.call_categorizer_model@champion` |
 | Validation | Jev (TypeSafe AI) + **MLflow Evaluation** (`mlflow.genai.evaluate`) |
 | Batch inference | `ai_query()` in Databricks SQL with a structured response format |
-| Governance | Unity Catalog grants, column mask, tags, lineage |
+| Governance | Unity Catalog grants, column mask, tags, lineage; PII checks on generated summaries |
+| RAG | Mosaic AI Vector Search Delta Sync index over category guidelines |
+| Orchestration | Databricks Job (serverless task DAG) |
+| Serving | Model Serving endpoint for the champion, AI Gateway inference table |
 | App | Databricks App (Streamlit) on the SQL warehouse |
 
 Data: [ABCD](https://github.com/asappresearch/abcd) (ASAPP, MIT licence), about 10,000 synthetic
@@ -48,6 +51,22 @@ Open each one in `notebooks/` and click **Run all** at the top (compute: *Server
 | 07 | `07_governance` | 2 min | `OK` lines for grants, mask and tags. **Stop before part 4** until the app exists |
 
 Settings (catalog, schema, model) are the boxes at the top of each notebook; leave them as they are.
+
+### 2b. Stage 2: RAG, PII-safe summaries, Job, Serving
+After a **Pull** of the Git folder, run these in order (Run all):
+
+| # | Notebook | Time | What you should see |
+|---|---|---|---|
+| 03 | `03_dspy_categorizer` (again: the prompt now forbids personal data in summaries) | 20-30 min | new zero-shot/optimized numbers; "is now the champion" or "Kept the current champion" |
+| 08 | `08_rag_vector_search` | 30-45 min first time | guidelines table; Vector Search endpoint + index ready; retrieval recall@8; RAG accuracy; promotion message |
+| 04 | `04_jev_validation` | 10 min | "Validating model: dspy_rag", Jev numbers, the PII line |
+| 05 | `05_batch_ai_query` | 5-10 min | comparison table with every model |
+| 06 | `06_job` | 1 min (+20 min run) | a job link; open it and watch the task graph turn green |
+| 09 | `09_model_serving` | 20-40 min | endpoint ready + 3 served answers, or a plain message that Free Edition doesn't allow it |
+
+Then redeploy the app (it now opens on the most accurate model).
+
+**After approving category changes in the app:** rerun **03 and then 08**. 03 retrains on the new list (a champion trained on an older list is always replaced); 08 rebuilds the guidelines and index and brings RAG back. The first job run (06) can take up to ~1 hour if 08 has never run before (it waits for Vector Search); a task that times out is retried once automatically.
 
 ### 3. Deploy the review app (once, ~5 minutes)
 1. **+ New** → **App** (Apps also live in the app switcher, the grid icon at the top right) →

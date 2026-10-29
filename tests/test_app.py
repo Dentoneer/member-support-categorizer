@@ -27,7 +27,9 @@ class _Cursor:
 
     def fetchall_arrow(self):
         q = self.q
-        if "DISTINCT model" in q:
+        if "ORDER BY m.value DESC LIMIT 1" in q:
+            df = pd.DataFrame({"model": ["dspy_optimized"]})
+        elif "DISTINCT model" in q:
             df = pd.DataFrame({"model": ["baseline", "dspy_optimized"]})
         elif "app_admins" in q:
             df = pd.DataFrame({"ok": [True]})
