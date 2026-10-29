@@ -78,3 +78,13 @@ def test_write_validations_nulls_and_rerun(spark):
     write_validations(spark, s, rows)
     write_validations(spark, s, rows)
     assert spark.table(s.fqn("validations")).count() == 1
+
+
+def test_accuracy_rows_adds_pii_rate_when_summaries_exist():
+    truth = pd.DataFrame({"call_id": ["1", "2"], "primary_category": ["p", "p"], "secondary_category": ["s", "s"]})
+    preds = pd.DataFrame({"call_id": ["1", "2"], "primary_category": ["p", "p"], "secondary_category": ["s", "s"],
+                          "valid": [True, True], "concise_summary": ["Gold member asks", "clean summary"]})
+    m = {r["metric"]: r["value"] for r in accuracy_rows(preds, truth, "m")}
+    assert m["summary_pii_rate"] == 0.5
+    no_sum = preds.drop(columns="concise_summary")
+    assert "summary_pii_rate" not in {r["metric"] for r in accuracy_rows(no_sum, truth, "m")}

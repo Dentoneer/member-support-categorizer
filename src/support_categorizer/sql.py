@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from support_categorizer.pii import SUMMARY_PII_RULE
 from support_categorizer.settings import (
     APP_ADMINS,
     CALLS_CLEAN,
@@ -20,7 +21,7 @@ from support_categorizer.settings import (
 AI_QUERY_INSTRUCTION = (
     "You categorize member-support calls. Read the call and answer with a JSON object with keys "
     "primary_category, secondary_category (choose from the allowed values), urgency_score (integer "
-    "1 = routine to 5 = urgent) and concise_summary (at most 40 words)."
+    "1 = routine to 5 = urgent) and concise_summary (at most 40 words). " + SUMMARY_PII_RULE
 )
 OUTPUT_DDL = "primary_category STRING, secondary_category STRING, urgency_score INT, concise_summary STRING"
 

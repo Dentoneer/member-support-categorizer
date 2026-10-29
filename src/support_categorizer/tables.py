@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from support_categorizer.pii import pii_rate
 from support_categorizer.settings import (
     APP_ADMINS,
     EVAL_N,
@@ -113,11 +114,16 @@ def accuracy_rows(preds: pd.DataFrame, truth: pd.DataFrame, model: str) -> list[
     n = len(m)
     sec = (valid & (m["secondary_category_true"] == m["secondary_category_pred"])).sum()
     pri = (valid & (m["primary_category_true"] == m["primary_category_pred"])).sum()
-    return [
+    rows = [
         {"model": model, "metric": "secondary_accuracy", "value": sec / n if n else 0.0, "n": n},
         {"model": model, "metric": "primary_accuracy", "value": pri / n if n else 0.0, "n": n},
         {"model": model, "metric": "valid_rate", "value": valid.mean() if n else 0.0, "n": n},
     ]
+    if "concise_summary" in preds and preds["concise_summary"].notna().any():
+        summaries = [x for x in preds["concise_summary"] if isinstance(x, str) and x]
+        rows.append({"model": model, "metric": "summary_pii_rate", "value": pii_rate(summaries),
+                     "n": len(summaries)})  # fmt: skip
+    return rows
 
 
 def write_metrics(spark, s: Settings, rows: list[dict]) -> None:
