@@ -161,7 +161,7 @@ try:
     with mlflow.start_run(run_name=f"evaluate_{MODEL}"):
         res = mlflow.genai.evaluate(data=data, scorers=[secondary_correct, jev_scorer(client, s.jev_model),
                                                         faithful, no_personal_data, summary_has_no_pii])
-    display(pd.DataFrame([res.metrics]).T.rename(columns={0: "value"}))  # noqa: F821
+    display(pd.DataFrame({"metric": list(res.metrics), "value": list(res.metrics.values())}))  # noqa: F821
 except Exception as e:  # the Jev numbers above are already saved; this part is a bonus
     print(f"MLflow Evaluation could not run here ({str(e)[:300]}). The Jev results above are saved.")
 
