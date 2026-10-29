@@ -122,13 +122,21 @@ display(pd.DataFrame(result))  # noqa: F821
 # MAGIC %md
 # MAGIC **3 · Optimize with BootstrapFewShot (~5 minutes).** DSPy runs the program on training calls, keeps
 # MAGIC the runs that got the right answer (judged by our metric), and puts up to 4 of them into the prompt
-# MAGIC as worked examples. Then it registers the optimized program in Unity Catalog and scores it on the same
-# MAGIC 300 calls.
+# MAGIC as worked examples. It registers the optimized program in Unity Catalog as the **challenger**, scores it on
+# MAGIC the same 300 calls, and makes it **champion** only if it beats the current champion (first run: it does).
 
 # COMMAND ----------
 
 from support_categorizer.categorizer import examples_from, optimize
-from support_categorizer.registry import register_program
+from support_categorizer.registry import (
+    champion_score,
+    model_resources,
+    promote,
+    register_program,
+    should_promote,
+    tag_score,
+)
+from support_categorizer.settings import CHALLENGER_ALIAS
 
 RUN_MIPRO = False  # True = also try MIPROv2 (rewrites the instructions too; ~20-40 extra minutes)
 with mlflow.start_run(run_name="dspy_optimized") as run:
@@ -139,7 +147,8 @@ with mlflow.start_run(run_name="dspy_optimized") as run:
                          mode="mipro" if RUN_MIPRO else "bootstrap")
     example = {"call_transcript": rows[0]["call_transcript"], "customer_tier": rows[0]["customer_tier"],
                "guidelines": ""}
-    reg = register_program(optimized, s, example)
+    reg = register_program(optimized, s, example, alias=CHALLENGER_ALIAS,
+                           resources=model_resources(s.llm_endpoint))
     version = f"{reg.get('version', 'file')}/tax{tv}"
     preds = predict_rows(optimized, rows, "dspy_optimized", version, run.info.run_id, lm=lm)
     result = accuracy_rows(pd.DataFrame(preds), sample, "dspy_optimized")
@@ -147,6 +156,14 @@ with mlflow.start_run(run_name="dspy_optimized") as run:
 write_predictions(spark, s, preds)  # noqa: F821
 write_metrics(spark, s, result)  # noqa: F821
 display(pd.DataFrame(result))  # noqa: F821
+score = next(r["value"] for r in result if r["metric"] == "secondary_accuracy")
+if reg.get("version"):  # champion/challenger: only a more accurate version takes over
+    tag_score(s, reg["version"], score)
+    current = champion_score(s)
+    if should_promote(score, current):
+        promote(s, reg["version"])
+    else:
+        print(f"Kept the current champion ({current:.1%}); this version scored {score:.1%}.")
 
 # COMMAND ----------
 
