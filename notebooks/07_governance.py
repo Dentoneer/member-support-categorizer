@@ -78,9 +78,16 @@ except Exception as e:  # noqa: BLE001
 
 # COMMAND ----------
 
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath("../src"))  # so this cell also works when run on its own
 from databricks.sdk import WorkspaceClient
 
+from support_categorizer.settings import APP_ADMINS, notebook_settings
 from support_categorizer.sql import app_grants_sql
+
+s = notebook_settings(dbutils)  # noqa: F821
 
 dbutils.widgets.text("app_name", "support-review")  # noqa: F821
 try:

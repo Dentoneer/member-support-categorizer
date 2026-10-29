@@ -50,14 +50,17 @@ Open each one in `notebooks/` and click **Run all** at the top (compute: *Server
 Settings (catalog, schema, model) are the boxes at the top of each notebook; leave them as they are.
 
 ### 3. Deploy the review app (once, ~5 minutes)
-1. Left bar → **Compute** → **Apps** → **Create app** → **Create a custom app**. Name: `support-review`.
-2. **Configure** → **Add resource** → **SQL warehouse** → pick the Serverless Starter Warehouse,
-   permission *Can use*, resource key **`sql-warehouse`** → **Create app**.
-3. When the app's compute is ready, click **Deploy** and choose the **root of the Git folder**
+1. **+ New** → **App** (Apps also live in the app switcher, the grid icon at the top right) →
+   **Create a custom app**. Name: `support-review`.
+2. Add the SQL warehouse as an **app resource** (on the create screen, or later under the app's
+   *Authorization* / *Settings*): **SQL warehouse** → Serverless Starter Warehouse, permission
+   *Can use*, resource key **`sql-warehouse`** (exactly).
+3. When the app's compute is running, click **Deploy** and choose the **root of the Git folder**
    (`/Workspace/Users/<you>/member-support-categorizer`, not the `app` subfolder).
 4. Back in notebook `07_governance`, run **part 4**. It gives the app access to the tables and makes
    you an approver.
 5. Open the app's URL. Tabs: **Categories & volumes**, **Review & override**, **Category requests**.
+   Stop the app (⋮ → Stop) when you're not using it.
 
 ### What to do if something stops
 - **"Could not download the ABCD data"**: follow the message (download the file on your laptop and
