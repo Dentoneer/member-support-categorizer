@@ -29,6 +29,7 @@ from support_categorizer.sql import (  # noqa: E402
     request_insert_sql,
     requests_sql,
     review_query_sql,
+    scored_true_counts_sql,
     taxonomy_insert_sql,
     taxonomy_sql,
     true_counts_sql,
@@ -81,15 +82,33 @@ tab_vol, tab_review, tab_req = st.tabs(["Categories & volumes", "Review & overri
 
 # ---- 1. categories and their volumes ------------------------------------------------------
 with tab_vol:
-    vol = volumes(query(true_counts_sql(S)), query(predicted_counts_sql(S), (("model", model),)), tax)
+    import altair as alt
+
+    m = (("model", model),)
+    vol = volumes(query(true_counts_sql(S)), query(predicted_counts_sql(S), m), tax,
+                  scored_true=query(scored_true_counts_sql(S), m))  # fmt: skip
     prim = primary_volumes(vol)
+
+    def bars(df: pd.DataFrame, key: str):
+        """True vs predicted calls side by side, y-axis from zero."""
+        long = df.melt(id_vars=key, value_vars=["calls_true_scored", "calls_predicted"],
+                       var_name="series", value_name="calls")  # fmt: skip
+        long["series"] = long["series"].map({"calls_true_scored": "true label",
+                                             "calls_predicted": "model's label"})  # fmt: skip
+        return (alt.Chart(long).mark_bar()
+                .encode(x=alt.X(f"{key}:N", title=None, axis=alt.Axis(labelAngle=-40)),
+                        xOffset="series:N",
+                        y=alt.Y("calls:Q", scale=alt.Scale(zero=True), title="calls"),
+                        color=alt.Color("series:N", title=None), tooltip=[key, "series", "calls"])
+                .properties(height=340))  # fmt: skip
+
     st.subheader("Calls per category")
-    st.caption("calls_all = every call by its true label · calls_predicted = scored calls by the model's "
-               "label (supervisor overrides win)")
-    st.bar_chart(prim.set_index("primary_category")[["calls_predicted"]])
+    st.caption("On the calls this model scored: how many truly belong to each category vs how many the "
+               "model put there (supervisor overrides win). calls_all in the table = every call.")
+    st.altair_chart(bars(prim, "primary_category"), use_container_width=True)
     pick = st.selectbox("Drill into a category", prim["primary_category"])
-    sub = vol[vol["primary_category"] == pick]
-    st.bar_chart(sub.set_index("secondary_category")[["calls_predicted"]])
+    st.altair_chart(bars(vol[vol["primary_category"] == pick], "secondary_category"),
+                    use_container_width=True)  # fmt: skip
     st.dataframe(vol, use_container_width=True, hide_index=True)
 
 # ---- 2. review and override --------------------------------------------------------------
