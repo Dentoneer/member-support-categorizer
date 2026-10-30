@@ -48,6 +48,7 @@ _Last updated: 2026-10-29 (stage 2 merged; learning walkthrough started; protect
 - Stakeholder deck (13 slides, non-technical, private artifact): https://claude.ai/artifact/QKbfN9yqUcRv7JhWjuMFus
 
 ## Recent decisions
+- 2026-10-29: Marco declined further retrieval upgrades (example phrasings in guidelines, similar-past-call few-shot): keep complexity as is.
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
 - Two stages: stage 1 = core + Jev + UC governance + app (Marco moved those in); stage 2 = RAG
   (Vector Search over ABCD guidelines), Job (Workflows), Model Serving + inference tables.
