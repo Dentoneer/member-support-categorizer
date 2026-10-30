@@ -45,6 +45,7 @@ _Last updated: 2026-10-29 (stage 2 merged; learning walkthrough started; protect
   09 serving WORKS on Free Edition (endpoint support-categorizer serving champion v4; ai_query on it OK).
   Note: app default = best secondary_accuracy in metrics = baseline (no summaries); pick dspy_rag in the selector.
   Still to do: app redeploy.
+- Stakeholder deck (13 slides, non-technical, private artifact): https://claude.ai/artifact/QKbfN9yqUcRv7JhWjuMFus
 
 ## Recent decisions
 - Data: ABCD instead of CFPB (clean labels, call transcripts, membership tier); hand review dropped.
